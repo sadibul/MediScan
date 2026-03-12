@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -66,11 +67,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.mediscan.app.core.theme.ErrorRed
 import com.mediscan.app.core.theme.HealthGreen
 import com.mediscan.app.core.theme.MediBlue
@@ -81,6 +82,7 @@ import com.mediscan.app.core.utils.NetworkResult
 import com.mediscan.app.data.model.Medication
 import com.mediscan.app.data.model.Prescription
 import com.mediscan.app.ui.components.common.MediButton
+import kotlinx.coroutines.tasks.await
 
 /**
  * PrescriptionDetailScreen — view + edit a single prescription.
@@ -326,12 +328,7 @@ private fun PrescriptionDetailContent(
         if (!prescription.imageUrl.isNullOrBlank()) {
             SectionCard(title = "Scanned Image", icon = Icons.Default.Person,
                 accentColor = Color(0xFF9C27B0)) {
-                AsyncImage(
-                    model = prescription.imageUrl,
-                    contentDescription = "Scanned prescription",
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.FillWidth
-                )
+                PrescriptionImageLoader(imageUrl = prescription.imageUrl!!)
             }
             Spacer(modifier = Modifier.height(14.dp))
         }
@@ -477,12 +474,7 @@ private fun EditPrescriptionContent(
         if (!prescription.imageUrl.isNullOrBlank()) {
             SectionCard(title = "Scanned Image (read-only)", icon = Icons.Default.Person,
                 accentColor = Color(0xFF9C27B0)) {
-                AsyncImage(
-                    model = prescription.imageUrl,
-                    contentDescription = "Scanned prescription",
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.FillWidth
-                )
+                PrescriptionImageLoader(imageUrl = prescription.imageUrl!!)
             }
             Spacer(modifier = Modifier.height(12.dp))
         }
@@ -752,5 +744,153 @@ private fun EditableChip(
                 .clickable { onRemove() }
                 .padding(2.dp)
         )
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Reusable prescription image loader with proper states
+// Uses Firebase Storage SDK to download authenticated images
+// Caches images in memory for instant re-display
+// ═══════════════════════════════════════════════════════════
+
+/** Simple in-memory LRU cache for prescription images (max 8 images) */
+private object PrescriptionImageCache {
+    private val cache = android.util.LruCache<String, android.graphics.Bitmap>(8)
+
+    fun get(url: String): android.graphics.Bitmap? = cache.get(url)
+    fun put(url: String, bitmap: android.graphics.Bitmap) { cache.put(url, bitmap) }
+}
+
+@Composable
+private fun PrescriptionImageLoader(imageUrl: String) {
+    // Check cache first for instant display
+    var imageBitmap by remember(imageUrl) {
+        mutableStateOf(PrescriptionImageCache.get(imageUrl))
+    }
+    var isLoading by remember(imageUrl) { mutableStateOf(imageBitmap == null) }
+    var errorMessage by remember(imageUrl) { mutableStateOf<String?>(null) }
+    var retryKey by remember { mutableStateOf(0) }
+
+    // Only fetch if not already cached
+    if (imageBitmap == null) {
+        LaunchedEffect(imageUrl, retryKey) {
+            isLoading = true
+            errorMessage = null
+            try {
+                val storage = com.google.firebase.storage.FirebaseStorage.getInstance()
+                val ref = try {
+                    storage.getReferenceFromUrl(imageUrl)
+                } catch (_: Exception) {
+                    null
+                }
+
+                if (ref != null) {
+                    val bytes = ref.getBytes(10L * 1024 * 1024).await()
+                    val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                    if (bmp != null) {
+                        PrescriptionImageCache.put(imageUrl, bmp)
+                        imageBitmap = bmp
+                        isLoading = false
+                    } else {
+                        errorMessage = "Could not decode image"
+                        isLoading = false
+                    }
+                } else {
+                    val bmp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            val url = java.net.URL(imageUrl)
+                            val conn = url.openConnection()
+                            conn.connectTimeout = 15_000
+                            conn.readTimeout = 15_000
+                            android.graphics.BitmapFactory.decodeStream(conn.getInputStream())
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
+                    if (bmp != null) {
+                        PrescriptionImageCache.put(imageUrl, bmp)
+                        imageBitmap = bmp
+                        isLoading = false
+                    } else {
+                        errorMessage = "Could not load image"
+                        isLoading = false
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("PrescriptionImage", "Failed to load: $imageUrl", e)
+                errorMessage = e.message ?: "Unknown error"
+                isLoading = false
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFF5F5F5)),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            isLoading -> {
+                Column(
+                    modifier = Modifier.padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(
+                        color = Color(0xFF9C27B0),
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.5.dp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Loading image…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+
+            errorMessage != null -> {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.BrokenImage,
+                        contentDescription = null,
+                        tint = Color(0xFF9E9E9E),
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Could not load image",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        errorMessage ?: "",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFBDBDBD),
+                        maxLines = 2
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    MediButton(
+                        text = "Retry",
+                        onClick = { retryKey++ },
+                    )
+                }
+            }
+
+            imageBitmap != null -> {
+                androidx.compose.foundation.Image(
+                    bitmap = imageBitmap!!.asImageBitmap(),
+                    contentDescription = "Scanned prescription",
+                    modifier = Modifier.fillMaxWidth(),
+                    contentScale = ContentScale.FillWidth
+                )
+            }
+        }
     }
 }

@@ -24,7 +24,7 @@ object ApiEndpoints {
     // │  ⬇️ CHANGE THIS to your Mac's WiFi/Hotspot IP  │
     // │  Run in terminal: ipconfig getifaddr en0        │
     // └─────────────────────────────────────────────────┘
-    private const val PHYSICAL_DEVICE_IP = "10.215.144.203"
+    private const val PHYSICAL_DEVICE_IP = "10.141.178.203"
 
     private const val PORT = "8000"
     private const val EMULATOR_IP = "10.0.2.2"

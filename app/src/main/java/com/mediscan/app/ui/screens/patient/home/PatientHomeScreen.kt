@@ -111,6 +111,11 @@ fun PatientHomeScreen(
     val userProfileState by viewModel.userProfile.collectAsState()
     val appointmentsState by viewModel.appointments.collectAsState()
 
+    // Ensure notification observer is running
+    LaunchedEffect(Unit) {
+        notificationViewModel.startObserving()
+    }
+
     // Refresh appointments every time this screen becomes visible
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {

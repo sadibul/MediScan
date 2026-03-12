@@ -47,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -96,6 +97,11 @@ fun DoctorAppointmentsScreen(
     var isRefreshing by remember { mutableStateOf(false) }
     val pullRefreshState = rememberPullToRefreshState()
     var selectedFilter by remember { mutableStateOf("all") }
+
+    // Ensure notification observer is running
+    LaunchedEffect(Unit) {
+        notificationViewModel.startObserving()
+    }
 
     var selectedAppointment by remember { mutableStateOf<Appointment?>(null) }
 

@@ -64,14 +64,15 @@ class NotificationRepository @Inject constructor(
     fun observeUnreadCount(userId: String): Flow<Int> = callbackFlow {
         val listener = collection
             .whereEqualTo("recipientId", userId)
+            .whereEqualTo("isRead", false)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
+                    android.util.Log.e("NotificationRepo", "observeUnreadCount error", error)
                     trySend(0)
                     return@addSnapshotListener
                 }
-                val unread = snapshot?.documents?.count { doc ->
-                    doc.getBoolean("isRead") == false
-                } ?: 0
+                val unread = snapshot?.size() ?: 0
+                android.util.Log.d("NotificationRepo", "observeUnreadCount: $unread unread for user=$userId")
                 trySend(unread)
             }
         awaitClose { listener.remove() }

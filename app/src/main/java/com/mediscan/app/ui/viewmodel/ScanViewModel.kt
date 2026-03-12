@@ -117,6 +117,7 @@ class ScanViewModel @Inject constructor(
 
             // Step 1: Upload image to Firebase Storage
             val prescriptionId = "rx_${System.currentTimeMillis()}"
+            Log.d(TAG, "savePrescription: uploading image (${imageBytes.size} bytes) for $prescriptionId")
             val imageUrlResult = prescriptionRepository.uploadPrescriptionImage(
                 patientId = uid,
                 prescriptionId = prescriptionId,
@@ -124,8 +125,14 @@ class ScanViewModel @Inject constructor(
             )
 
             val imageUrl = when (imageUrlResult) {
-                is NetworkResult.Success -> imageUrlResult.data
-                is NetworkResult.Error -> null // Save without image URL
+                is NetworkResult.Success -> {
+                    Log.d(TAG, "savePrescription: image uploaded OK → ${imageUrlResult.data}")
+                    imageUrlResult.data
+                }
+                is NetworkResult.Error -> {
+                    Log.e(TAG, "savePrescription: image upload FAILED → ${imageUrlResult.message}")
+                    null
+                }
                 else -> null
             }
 
@@ -146,6 +153,7 @@ class ScanViewModel @Inject constructor(
             )
 
             // Step 3: Save to Firestore
+            Log.d(TAG, "savePrescription: saving to Firestore, imageUrl=${prescription.imageUrl}")
             _saveState.value = prescriptionRepository.savePrescription(prescription)
         }
     }

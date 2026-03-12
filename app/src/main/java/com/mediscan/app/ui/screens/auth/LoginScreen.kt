@@ -95,14 +95,16 @@ fun LoginScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
-    // Remember Me — load saved email on first composition
-    val preferencesManager = remember { PreferencesManager(context) }
-    var email by remember { mutableStateOf(preferencesManager.savedEmail) }
+    // Remember Me — load saved email on first composition (crash-safe)
+    val preferencesManager = remember {
+        try { PreferencesManager(context) } catch (_: Exception) { null }
+    }
+    var email by remember { mutableStateOf(preferencesManager?.savedEmail ?: "") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    var rememberMe by remember { mutableStateOf(preferencesManager.rememberMe) }
+    var rememberMe by remember { mutableStateOf(preferencesManager?.rememberMe ?: false) }
 
     // ── Google Sign-In launcher ──
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -150,7 +152,7 @@ fun LoginScreen(
         when (val state = loginState) {
             is NetworkResult.Success -> {
                 // Save remember-me preference
-                preferencesManager.onLoginSuccess(email, rememberMe)
+                preferencesManager?.onLoginSuccess(email, rememberMe)
                 viewModel.fetchUserProfile(state.data.uid)
             }
             is NetworkResult.Error -> {
