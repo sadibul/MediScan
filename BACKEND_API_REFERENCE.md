@@ -1,6 +1,6 @@
 # 🔌 MediScan — Backend API Reference
 
-> **For AI Assistant:** This document contains ALL backend code, endpoints, request/response formats, and connection details needed to build the Android app. The backend is **already built and working** — do NOT modify it. The Android app just needs to connect to it.
+> **Status:** ✅ Backend is **COMPLETE and WORKING**. The Android app is fully integrated and connects to this server for AI prescription extraction.
 
 ---
 
@@ -13,6 +13,8 @@
 | **Default Port** | 8000 |
 | **AI Pipeline** | Quality Check (ResNet18) → YOLOv8s (9-class) → PaddleOCR (English) → Spatial Grouping |
 | **Docs UI** | `http://localhost:8000/docs` (Swagger) |
+| **GPU Acceleration** | CUDA (NVIDIA), MPS (Apple Silicon), or CPU fallback |
+| **Integration Status** | ✅ Fully connected to Android app via Retrofit2 + OkHttp |
 
 ### How to Start the Server:
 ```bash
@@ -21,19 +23,29 @@ python backend/fastapi_app.py
 ```
 The server loads AI models on startup (~10-20 seconds), then is ready to accept requests.
 
+### GPU Auto-Detection:
+The server automatically selects the best available compute device:
+1. **CUDA** (NVIDIA GPU) — fastest inference (~2-4 sec/image)
+2. **MPS** (Apple Silicon Metal) — good performance (~3-5 sec/image)
+3. **CPU** — fallback, slowest (~8-12 sec/image)
+
+> **Note:** PaddleOCR always runs on CPU regardless of GPU availability (PaddlePaddle framework limitation).
+
 ---
 
 ## 🌐 Connection from Android
 
-### Base URLs:
+### Base URLs (Auto-Detected):
 
-| Scenario | Base URL | When to Use |
-|----------|----------|-------------|
-| **Android Emulator** | `http://10.0.2.2:8000/` | Emulator → host PC (most common for dev) |
-| **Physical Device (WiFi)** | `http://192.168.x.x:8000/` | Phone on same WiFi as PC |
+The Android app auto-detects whether it's running on an emulator or physical device via `ApiEndpoints.kt`:
+
+| Scenario | Base URL | Detection |
+|----------|----------|-----------|
+| **Android Emulator** | `http://10.0.2.2:8000/` | Auto-detected via `Build.FINGERPRINT` |
+| **Physical Device (WiFi)** | `http://10.136.147.203:8000/` | Current configured IP |
 | **Production** | `https://api.mediscan.com/` | Future: deployed server |
 
-> **⚠️ Important:** `10.0.2.2` is a special Android emulator alias that maps to the host machine's `localhost`. A physical device cannot use this — use the PC's actual WiFi IP instead (find via `ipconfig` on Windows).
+> **Current physical device IP:** `10.136.147.203` — update `PHYSICAL_DEVICE_IP` in `ApiEndpoints.kt` if your network changes.
 
 ### Android Network Requirements:
 
@@ -94,14 +106,18 @@ The server loads AI models on startup (~10-20 seconds), then is ready to accept 
 {
     "status": "healthy",
     "timestamp": "2026-02-24T10:30:15.123456",
-    "cuda_available": true,
-    "gpu_name": "NVIDIA GeForce RTX 3060",
+    "cuda_available": false,
+    "mps_available": true,
+    "gpu_name": null,
+    "device": "mps",
     "model_loaded": true,
     "quality_checker_loaded": true,
     "pipeline_version": "v6_9class_english",
     "ocr_engine": "paddleocr"
 }
 ```
+
+> **Note:** The health response varies by platform. On NVIDIA systems, `cuda_available: true` and `gpu_name` shows the GPU model. On Apple Silicon, `mps_available: true`. On CPU-only systems, both are `false`.
 
 **Android Usage:** Call on app launch to verify connectivity. Show green/red indicator.
 
@@ -341,7 +357,7 @@ Body: file=<image_file>
 
 ---
 
-## 🔧 Retrofit2 Interface (Copy-Paste Ready)
+## 🔧 Retrofit2 Interface (Implemented)
 
 ```kotlin
 // data/remote/FastApiService.kt
@@ -363,38 +379,58 @@ interface FastApiService {
 }
 ```
 
-### How to Call from ViewModel:
+### How It's Called from ScanViewModel:
 
+**Camera path** — image bytes already in JPEG format from CameraX:
 ```kotlin
-// Step 1: Convert CameraX ImageProxy to ByteArray
-fun ImageProxy.toByteArray(): ByteArray {
-    val buffer = planes[0].buffer
-    val bytes = ByteArray(buffer.remaining())
-    buffer.get(bytes)
-    return bytes
-}
-
-// Step 2: Convert bitmap to byte array (alternative)
-fun Bitmap.toByteArray(): ByteArray {
-    val stream = ByteArrayOutputStream()
-    compress(Bitmap.CompressFormat.JPEG, 85, stream)
-    return stream.toByteArray()
-}
-
-// Step 3: Send to API
-val base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
-val request = mapOf("image" to base64Image)
-val result = fastApiService.extractPrescription(request)
-
-// Step 4: Check result
-when (result.status) {
-    "completed" -> {
-        // Show medications in bottom sheet
-        // result.medications, result.doctor, etc.
+fun processImage(imageBytes: ByteArray) {
+    viewModelScope.launch {
+        _extractionState.value = NetworkResult.Loading
+        val base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP)
+        val request = mapOf("image" to base64Image)
+        val result = fastApiService.extractPrescription(request)
+        _extractionState.value = NetworkResult.Success(result)
     }
-    "rejected" -> {
-        // Show error: result.message
-        // Offer to retake photo
+}
+```
+
+**Gallery path** — handles format conversion + EXIF rotation on IO thread:
+```kotlin
+fun processGalleryImage(uri: Uri, context: Context) {
+    viewModelScope.launch(Dispatchers.IO) {
+        // 1. Decode any format (HEIC, WebP, PNG, JPEG)
+        val inputStream = context.contentResolver.openInputStream(uri)
+        val bitmap = BitmapFactory.decodeStream(inputStream)
+
+        // 2. Read EXIF rotation metadata
+        val exifStream = context.contentResolver.openInputStream(uri)
+        val exif = ExifInterface(exifStream!!)
+        val rotation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ...)
+
+        // 3. Apply rotation via Matrix
+        val matrix = Matrix().apply { postRotate(degrees) }
+        val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, w, h, matrix, true)
+
+        // 4. Re-encode as JPEG (backend compatible)
+        val stream = ByteArrayOutputStream()
+        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
+
+        // 5. Send to API
+        processImage(stream.toByteArray())
+    }
+}
+```
+
+### Saving Results to Firebase:
+```kotlin
+fun savePrescription(extractionResult: ExtractionResult, imageBytes: ByteArray) {
+    viewModelScope.launch {
+        // 1. Upload image to Firebase Storage
+        val imageRef = storageRef.child("prescription_images/$userId/$prescriptionId.jpg")
+        imageRef.putBytes(imageBytes).await()
+
+        // 2. Save prescription document to Firestore
+        firestore.collection("prescriptions").document(prescriptionId).set(prescriptionData).await()
     }
 }
 ```
@@ -710,5 +746,6 @@ try {
 ---
 
 *Document Created: February 24, 2026*
+*Last Updated: February 2026 — Added MPS/GPU support notes, updated connection info, reflected actual implementation*
 *Server Version: 6.1.0*
-*Status: Backend is COMPLETE and WORKING — do not modify*
+*Status: Backend is COMPLETE and WORKING — Android app is FULLY INTEGRATED*

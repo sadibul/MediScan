@@ -1,7 +1,7 @@
 # 🏗️ System Design: MediScan
 ## AI-Powered Prescription Digitization & Smart Medicine Management System
 
-> **Last Updated:** February 24, 2026 — Final architecture (Kotlin/Compose + Firebase + FastAPI)
+> **Last Updated:** February 2026 — Final architecture (Kotlin/Compose + Firebase + FastAPI) — **ALL COMPONENTS IMPLEMENTED ✅**
 
 ---
 
@@ -57,9 +57,10 @@
 | Single app or separate apps? | **Single APK** with role-based UI | Simpler to maintain, shared auth logic |
 | Where to store user data? | **Firebase Firestore** (cloud) | Real-time sync, offline cache, free tier, no server setup |
 | Where to store images? | **Firebase Storage** | Secured by Firebase Auth UID, 5GB free |
-| Where to run AI? | **FastAPI server** (your laptop or cloud) | GPU needed for YOLO + PaddleOCR, too heavy for mobile |
+| Where to run AI? | **FastAPI server** (local machine or cloud) | GPU needed for YOLO + PaddleOCR, too heavy for mobile |
 | Auth system? | **Firebase Auth** only | Native Android SDK, Google Sign-In built-in, no custom JWT needed |
-| Local offline cache? | **Room (SQLite)** | Official Jetpack, Kotlin coroutines, compile-time SQL checks |
+| Image input? | **CameraX + Gallery picker** | Dual input for flexibility — camera for new photos, gallery for existing |
+| Image caching? | **LRU memory cache** | PrescriptionImageCache (50 images, 100MB) avoids redundant Firebase downloads |
 
 ---
 
@@ -76,132 +77,142 @@
 │                                                                         │
 │  📱 PATIENT ROLE                    👨‍⚕️ DOCTOR ROLE                      │
 │  ─────────────                     ─────────────                        │
-│  • Camera capture (CameraX)        • View patients list                 │
-│  • Upload prescription image       • Search patients                    │
-│  • View extracted medications      • View patient Rx history            │
-│  • Medication reminders            • View all medications               │
-│  • Prescription history            • Digital prescription writing       │
-│  • Book appointments               • Patient diagnosis history          │
-│  • Buy medicines (browse)          • Analytics dashboard (Vico charts)  │
-│  • Nearby hospitals (Maps)         • Appointment management             │
-│  • Profile management              • Profile management                 │
+│  • Camera capture (CameraX)    ✅  • View patients list             ✅ │
+│  • Gallery image picker        ✅  • Search patients                ✅ │
+│  • Upload prescription image   ✅  • View patient Rx history        ✅ │
+│  • View extracted medications  ✅  • View all medications           ✅ │
+│  • Prescription history        ✅  • Digital prescription writing   ✅ │
+│  • Book appointments           ✅  • Patient diagnosis history      ✅ │
+│  • Buy medicines (browse)      ✅  • Analytics dashboard (Vico)     ✅ │
+│  • Nearby hospitals (Maps)     ✅  • Appointment management         ✅ │
+│  • Profile management          ✅  • Profile management             ✅ │
+│  • Doctor orders (view)        ✅  • Notifications                  ✅ │
+│  • Notifications               ✅                                      │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-#### Tech Stack (Android):
+#### Tech Stack (Android) — All Implemented ✅:
 
-| Category | Library | Version | Purpose |
-|----------|---------|---------|---------|
-| **Language** | Kotlin | 1.9+ | Primary language |
-| **UI Framework** | Jetpack Compose | Material 3 | Declarative UI |
-| **Architecture** | MVVM + Clean Architecture | — | Separation of concerns |
-| **DI** | Hilt (Dagger) | 2.50+ | Dependency injection |
-| **HTTP Client** | Retrofit2 + OkHttp | 2.9+ / 4.12+ | API calls to FastAPI |
-| **Auth** | Firebase Auth | latest | Email/password + Google Sign-In |
-| **Cloud DB** | Firebase Firestore | latest | User data, prescriptions, appointments |
-| **Cloud Storage** | Firebase Storage | latest | Prescription images |
-| **Local DB** | Room (SQLite) | 2.6+ | Offline cache |
-| **Camera** | CameraX | 1.3+ | Prescription photo capture |
-| **Image Loading** | Coil | 2.5+ | Async image loading (Compose-native) |
-| **Navigation** | Navigation Compose | 2.7+ | Screen routing |
-| **Charts** | Vico | 2.0+ | Doctor analytics (Compose-native) |
-| **Maps** | Google Maps Compose | 4.3+ | Hospital/pharmacy finder |
-| **Notifications** | WorkManager + FCM | latest | Local reminders + push notifications |
-| **Token Storage** | EncryptedSharedPreferences | latest | Secure local storage |
-| **Serialization** | Kotlinx Serialization or Gson | latest | JSON parsing |
+| Category | Library | Version | Purpose | Status |
+|----------|---------|---------|---------|--------|
+| **Language** | Kotlin | 2.0.21 | Primary language | ✅ |
+| **UI Framework** | Jetpack Compose | BOM 2024.12.01 | Declarative UI (Material 3) | ✅ |
+| **Architecture** | MVVM + Clean Architecture | — | Separation of concerns | ✅ |
+| **DI** | Hilt (Dagger) | 2.53.1 | Dependency injection | ✅ |
+| **HTTP Client** | Retrofit2 + OkHttp | 2.11.0 / 4.12.0 | API calls to FastAPI | ✅ |
+| **Auth** | Firebase Auth | BOM 33.7.0 | Email/password + Google Sign-In | ✅ |
+| **Cloud DB** | Firebase Firestore | BOM 33.7.0 | User data, prescriptions, appointments | ✅ |
+| **Cloud Storage** | Firebase Storage | BOM 33.7.0 | Prescription images | ✅ |
+| **Camera** | CameraX | 1.4.1 | Prescription photo capture | ✅ |
+| **Gallery** | ActivityResultContracts | AndroidX | Image picker with EXIF rotation | ✅ |
+| **Image Loading** | Coil + Firebase SDK | 2.7.0 | Avatars (Coil) + Rx images (SDK direct) | ✅ |
+| **Image Cache** | Custom LRU Cache | — | 50-image, 100MB prescription cache | ✅ |
+| **Navigation** | Navigation Compose | 2.8.5 | Screen routing with animations | ✅ |
+| **Charts** | Vico | 2.0.0-beta.2 | Doctor analytics (bar charts) | ✅ |
+| **Maps** | Google Maps Compose | 6.2.1 | Hospital/pharmacy finder | ✅ |
+| **Notifications** | Firestore Listeners | — | Real-time in-app notifications | ✅ |
+| **Token Storage** | EncryptedSharedPreferences | 1.1.0-alpha06 | Secure local storage (with fallback) | ✅ |
+| **Serialization** | Gson | 2.11.0 | JSON parsing | ✅ |
+| **Permissions** | Accompanist Permissions | 0.36.0 | Camera + location permissions | ✅ |
+| **Loading UI** | Shimmer | 1.3.2 | Loading placeholder animations | ✅ |
+| **EXIF** | ExifInterface | 1.3.7 | Gallery image rotation correction | ✅ |
 
-#### Android Project Structure:
+#### Android Project Structure (Actual — 58 Kotlin files):
 
 ```
-app/src/main/java/com/mediscan/
+app/src/main/java/com/mediscan/app/
 ├── MediScanApp.kt                      # Application class (@HiltAndroidApp)
 ├── MainActivity.kt                      # Single Activity (Compose)
 │
 ├── core/
 │   ├── constants/
-│   │   ├── AppColors.kt                # Color palette
-│   │   ├── AppStrings.kt               # String constants
-│   │   └── ApiEndpoints.kt             # FastAPI base URL + endpoints
+│   │   └── ApiEndpoints.kt             # Dynamic base URL (emulator/physical auto-detect)
 │   ├── theme/
-│   │   ├── Theme.kt                    # Material 3 Theme
-│   │   ├── Color.kt                    # Color definitions
+│   │   ├── Theme.kt                    # Material 3 Theme (MediScanTheme)
+│   │   ├── Color.kt                    # Color palette (gradient indigo/blue)
 │   │   └── Type.kt                     # Typography (Poppins + Roboto)
 │   ├── navigation/
-│   │   └── NavGraph.kt                 # Navigation Compose routes
+│   │   ├── NavGraph.kt                 # 22 routes with animated transitions
+│   │   └── Routes.kt                   # Route constants + helper functions
 │   └── utils/
-│       ├── Validators.kt               # Email/phone validation
-│       ├── DateUtils.kt                # Date formatting
-│       └── NetworkResult.kt            # Sealed class for API states
+│       ├── DateUtils.kt                # Date formatting utilities
+│       ├── MedicalSuggestions.kt        # Autocomplete data (diagnoses, tests, schedules)
+│       ├── NetworkResult.kt            # Sealed class (Idle/Loading/Success/Error)
+│       └── PreferencesManager.kt       # EncryptedSharedPreferences + fallback
 │
 ├── data/
 │   ├── model/
-│   │   ├── User.kt                     # Kotlin data class
-│   │   ├── Prescription.kt             # Kotlin data class
-│   │   ├── Medication.kt               # Kotlin data class
-│   │   ├── Appointment.kt              # Kotlin data class
-│   │   └── ExtractionResult.kt         # API response model
+│   │   ├── User.kt                     # User (patient + doctor fields)
+│   │   ├── Prescription.kt             # Prescription with medications list
+│   │   ├── Medication.kt               # Single medication data class
+│   │   ├── Appointment.kt              # Appointment data class
+│   │   ├── ExtractionResult.kt         # AI extraction response model
+│   │   ├── DoctorOrder.kt              # Doctor-written prescription
+│   │   └── Notification.kt             # Notification data class
 │   ├── remote/
-│   │   ├── FastApiService.kt           # Retrofit interface (AI extraction)
-│   │   └── dto/                        # Data Transfer Objects
-│   ├── local/
-│   │   ├── AppDatabase.kt              # Room database
-│   │   └── dao/                        # Room DAOs (PrescriptionDao, etc.)
+│   │   └── FastApiService.kt           # Retrofit interface (health, quality, extract)
 │   └── repository/
 │       ├── AuthRepository.kt           # Firebase Auth operations
-│       ├── PrescriptionRepository.kt   # Firestore + FastAPI
+│       ├── PrescriptionRepository.kt   # Firestore + FastAPI + Storage
 │       ├── AppointmentRepository.kt    # Firestore appointments
-│       └── UserRepository.kt           # Firestore user data
+│       ├── UserRepository.kt           # Firestore user profiles
+│       └── NotificationRepository.kt   # Firestore notifications + listener
 │
 ├── di/
-│   ├── AppModule.kt                    # Hilt: provides singletons
-│   ├── NetworkModule.kt                # Hilt: provides Retrofit + OkHttp
-│   └── DatabaseModule.kt              # Hilt: provides Room database
+│   ├── AppModule.kt                    # Hilt: Firebase singletons
+│   └── NetworkModule.kt                # Hilt: Retrofit + OkHttp (30s/90s/90s timeouts)
 │
-├── ui/
-│   ├── viewmodel/
-│   │   ├── AuthViewModel.kt            # Login/signup state
-│   │   ├── PrescriptionViewModel.kt    # Prescription CRUD
-│   │   ├── ScanViewModel.kt            # Camera + extraction
-│   │   ├── AppointmentViewModel.kt     # Appointments state
-│   │   └── DoctorViewModel.kt          # Doctor dashboard state
-│   ├── screens/
-│   │   ├── splash/
-│   │   │   └── SplashScreen.kt
-│   │   ├── auth/
-│   │   │   ├── LoginScreen.kt
-│   │   │   └── SignUpScreen.kt
-│   │   ├── patient/
-│   │   │   ├── PatientMainScreen.kt    # Bottom nav scaffold
-│   │   │   ├── home/
-│   │   │   │   └── PatientHomeScreen.kt
-│   │   │   ├── scan/
-│   │   │   │   └── ScanScreen.kt       # CameraX + extraction
-│   │   │   ├── docs/
-│   │   │   │   └── DocsScreen.kt       # Prescription history
-│   │   │   └── profile/
-│   │   │       └── PatientProfileScreen.kt
-│   │   └── doctor/
-│   │       ├── DoctorMainScreen.kt     # Bottom nav scaffold
-│   │       ├── appointments/
-│   │       │   └── DoctorAppointmentsScreen.kt
-│   │       ├── records/
-│   │       │   └── DoctorRecordsScreen.kt  # Analytics + Vico charts
-│   │       └── profile/
-│   │           └── DoctorProfileScreen.kt
-│   └── components/
-│       ├── common/
-│       │   ├── MediButton.kt
-│       │   ├── MediTextField.kt
-│       │   ├── LoadingIndicator.kt
-│       │   └── MediCard.kt
-│       ├── AppointmentCard.kt
-│       ├── PrescriptionCard.kt
-│       ├── MedicationCard.kt
-│       └── ExtractionResultSheet.kt
-│
-└── service/
-    └── ReminderWorker.kt               # WorkManager for medication reminders
+└── ui/
+    ├── viewmodel/
+    │   ├── AuthViewModel.kt            # Login/signup/Google sign-in state
+    │   ├── PatientViewModel.kt         # Patient dashboard state
+    │   ├── ScanViewModel.kt            # Camera + gallery + AI extraction
+    │   ├── DocsViewModel.kt            # Prescription list loading
+    │   ├── DoctorViewModel.kt          # Doctor dashboard state
+    │   ├── BookingViewModel.kt         # Doctor search + appointment booking
+    │   └── NotificationViewModel.kt    # Real-time notification listener
+    ├── screens/
+    │   ├── splash/
+    │   │   └── SplashScreen.kt
+    │   ├── auth/
+    │   │   ├── LoginScreen.kt          # Email/password + Google Sign-In
+    │   │   └── SignUpScreen.kt         # Registration with role selection
+    │   ├── patient/
+    │   │   ├── PatientMainScreen.kt    # Bottom nav (Home/Scan/Docs/Profile)
+    │   │   ├── home/PatientHomeScreen.kt
+    │   │   ├── scan/ScanScreen.kt      # CameraX + Gallery (741 lines)
+    │   │   ├── scan/CameraPreviewScreen.kt
+    │   │   ├── docs/DocsScreen.kt      # Prescription history
+    │   │   ├── docs/PrescriptionDetailScreen.kt
+    │   │   ├── docs/PrescriptionDetailViewModel.kt
+    │   │   ├── medicine/BuyMedicineScreen.kt
+    │   │   ├── orders/DoctorOrdersScreen.kt
+    │   │   └── profile/ (PatientProfile, EditProfile, ChangePassword)
+    │   ├── doctor/
+    │   │   ├── DoctorMainScreen.kt     # Bottom nav (Appointments/Records/Profile)
+    │   │   ├── appointments/DoctorAppointmentsScreen.kt
+    │   │   ├── appointments/PatientDetailSheet.kt
+    │   │   ├── appointments/PatientRecordsScreen.kt
+    │   │   ├── records/DoctorRecordsScreen.kt  # Vico charts
+    │   │   └── profile/ (DoctorProfile, DoctorEditProfile, DoctorChangePassword)
+    │   ├── booking/
+    │   │   ├── DoctorSearchScreen.kt
+    │   │   ├── DoctorDetailScreen.kt
+    │   │   └── PatientAppointmentsScreen.kt
+    │   ├── hospitals/
+    │   │   └── NearbyHospitalsScreen.kt  # Google Maps Compose
+    │   └── notifications/
+    │       └── NotificationsScreen.kt
+    └── components/
+        ├── AppointmentCard.kt
+        ├── ExtractionResultSheet.kt    # AI results bottom sheet
+        ├── QuickActionCard.kt
+        └── common/
+            ├── MediButton.kt
+            ├── MediCard.kt
+            ├── MediTextField.kt
+            └── ShimmerEffects.kt
 ```
 
 ---
@@ -389,8 +400,8 @@ app/src/main/java/com/mediscan/
 │  │  • PaddleOCR 3.2.2          - Text recognition (English)       │    │
 │  │  • ResNet18                 - Image quality classification      │    │
 │  │  • OpenCV 4.x               - Image preprocessing              │    │
-│  │  • PyTorch 2.5.1+cu121      - Deep learning framework          │    │
-│  │  • CUDA 12.1                - GPU (NVIDIA GTX 1660, 6GB)       │    │
+│  │  • PyTorch 2.5.1            - Deep learning framework           │    │
+│  │  • GPU: MPS (Apple Silicon) / CUDA (NVIDIA) / CPU fallback     │    │
 │  └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -452,6 +463,12 @@ app/src/main/java/com/mediscan/
 │  │  ├── specialization, dateTime, status, complaint                │   │
 │  │  └── createdAt: Timestamp                                       │   │
 │  │                                                                  │   │
+│  │  notifications/{notificationId}                                  │   │
+│  │  ├── userId, title, message, type                               │   │
+│  │  ├── isRead: Boolean                                            │   │
+│  │  ├── createdAt: Timestamp                                       │   │
+│  │  └── relatedId: String? (appointmentId/prescriptionId)          │   │
+│  │                                                                  │   │
 │  │  reminders/{reminderId}                                          │   │
 │  │  ├── patientId, prescriptionId, medicineName                    │   │
 │  │  ├── schedule, reminderTimes, isActive                          │   │
@@ -487,31 +504,39 @@ app/src/main/java/com/mediscan/
 
 ```
   ANDROID APP                    FASTAPI BACKEND           FIREBASE
-  (Kotlin/Compose)               (Your Laptop)
+  (Kotlin/Compose)               (Local Machine)
       │                             │                         │
       │  1. User captures photo     │                         │
       │     using CameraX           │                         │
+      │     OR picks from Gallery   │                         │
       │                             │                         │
-      │  2. Convert to base64       │                         │
+      │  2. Gallery path:           │                         │
+      │     - Decode (BitmapFactory)│                         │
+      │     - EXIF rotation fix     │                         │
+      │     - Re-encode as JPEG     │                         │
+      │     (all on IO thread)      │                         │
       │                             │                         │
-      │  3. POST /extract-base64    │                         │
+      │  3. Convert to base64       │                         │
+      │                             │                         │
+      │  4. POST /extract-base64    │                         │
       │     via Retrofit2           │                         │
       │     {"image": "<base64>"}   │                         │
       │ ──────────────────────────▶ │                         │
       │                             │                         │
-      │                             │  4. AI Pipeline:        │
+      │                             │  5. AI Pipeline:        │
       │                             │     Quality → YOLO →    │
       │                             │     OCR → Matching →    │
       │                             │     Spatial Grouping    │
       │                             │                         │
-      │  5. JSON response           │                         │
+      │  6. JSON response           │                         │
       │     {medications: [...]}    │                         │
       │ ◀────────────────────────── │                         │
       │                             │                         │
-      │  6. Show in bottom sheet    │                         │
+      │  7. Show in bottom sheet    │                         │
+      │     (ExtractionResultSheet) │                         │
       │     (editable by user)      │                         │
       │                             │                         │
-      │  7. User taps "Save" →      │                         │
+      │  8. User taps "Save" →      │                         │
       │     Upload image to Storage ──────────────────────▶   │
       │     Save Rx to Firestore   ───────────────────────▶   │
       │                             │                         │
@@ -549,28 +574,31 @@ app/src/main/java/com/mediscan/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                      DEVELOPMENT SETUP (Current)                         │
+│                    CURRENT DEVELOPMENT SETUP ✅                           │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Your Laptop (Backend — NVIDIA GTX 1660)                                │
+│  Your Machine (Backend — Apple Silicon Mac with MPS)                    │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │  • FastAPI + Uvicorn                    Port: 8000              │   │
-│  │  • YOLOv8s + PaddleOCR (GPU)           CUDA 12.1               │   │
-│  │  • Quality Checker (ResNet18)                                   │   │
+│  │  • YOLOv8s + ResNet18 (MPS GPU)        Metal Performance       │   │
+│  │  • PaddleOCR (CPU)                     Shaders acceleration    │   │
+│  │  • Auto-detects: CUDA → MPS → CPU                              │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                              ↕ HTTP (WiFi / same network)              │
 │  Physical Android Device / Emulator                                     │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │  • MediScan Kotlin app                                          │   │
-│  │  • Emulator: http://10.0.2.2:8000                               │   │
-│  │  • Physical: http://192.168.x.x:8000                            │   │
+│  │  • Emulator: http://10.0.2.2:8000 (auto-detected)              │   │
+│  │  • Physical: http://10.136.147.203:8000 (current IP)            │   │
+│  │  • OkHttp timeouts: 30s connect, 90s read, 90s write           │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                              ↕ HTTPS                                   │
 │  Firebase (Cloud — Free Tier)                                           │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  • Auth: unlimited email/Google users                           │   │
-│  │  • Firestore: 1GB storage, 50K reads/day                       │   │
-│  │  • Storage: 5GB, 1GB/day download                               │   │
+│  │  • Auth: unlimited email/Google users                    ✅     │   │
+│  │  • Firestore: 1GB storage, 50K reads/day                ✅     │   │
+│  │  • Storage: 5GB, 1GB/day download                        ✅     │   │
+│  │  • Messaging (FCM): available                            🔜     │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -627,24 +655,31 @@ app/src/main/java/com/mediscan/
 
 | Layer | Technology | Status |
 |-------|------------|--------|
-| **Android App** | Kotlin + Jetpack Compose (Material 3) | 🔜 To Build |
-| **Auth** | Firebase Auth (email + Google Sign-In) | 🔜 To Integrate |
-| **Cloud DB** | Firebase Firestore | 🔜 To Integrate |
-| **Image Storage** | Firebase Storage | 🔜 To Integrate |
-| **Local Cache** | Room (SQLite) | 🔜 Optional |
-| **HTTP Client** | Retrofit2 + OkHttp | 🔜 To Build |
-| **DI** | Hilt (Dagger) | 🔜 To Build |
-| **Camera** | CameraX | 🔜 To Build |
-| **Charts** | Vico | 🔜 To Build |
-| **Maps** | Google Maps Compose | 🔜 To Build |
-| **Notifications** | WorkManager + FCM | 🔜 To Build |
-| **AI Backend** | FastAPI v6.1 | ✅ **Done** |
+| **Android App** | Kotlin 2.0.21 + Jetpack Compose (Material 3) | ✅ **Done** (58 files, 28 screens) |
+| **Auth** | Firebase Auth (email + Google Sign-In) | ✅ **Done** |
+| **Cloud DB** | Firebase Firestore | ✅ **Done** (5 collections) |
+| **Image Storage** | Firebase Storage + LRU Cache | ✅ **Done** |
+| **HTTP Client** | Retrofit 2.11.0 + OkHttp 4.12.0 | ✅ **Done** |
+| **DI** | Hilt 2.53.1 (Dagger) | ✅ **Done** (2 modules) |
+| **Camera** | CameraX 1.4.1 + Gallery Picker | ✅ **Done** (dual input) |
+| **Charts** | Vico 2.0.0-beta.2 | ✅ **Done** (doctor analytics) |
+| **Maps** | Google Maps Compose 6.2.1 | ✅ **Done** (nearby hospitals) |
+| **Notifications** | Firestore Real-time Listeners | ✅ **Done** (in-app) |
+| **Permissions** | Accompanist Permissions 0.36.0 | ✅ **Done** (camera, location) |
+| **Loading UI** | Shimmer 1.3.2 | ✅ **Done** |
+| **EXIF Handling** | ExifInterface 1.3.7 | ✅ **Done** (gallery rotation) |
+| **Secure Storage** | EncryptedSharedPreferences + fallback | ✅ **Done** |
+| **AI Backend** | FastAPI v6.1 (MPS/CUDA/CPU) | ✅ **Done** |
 | **YOLO v6** | YOLOv8s (9 classes, 98.6% mAP50) | ✅ **Done** |
 | **OCR** | PaddleOCR 3.2.2 (English) | ✅ **Done** |
 | **Quality Checker** | ResNet18 + Laplacian (80%) | ✅ **Done** |
+| **Local DB** | Room (SQLite) | ⏸️ Not implemented (Firestore offline cache used instead) |
+| **Push Notifications** | FCM (Firebase Cloud Messaging) | ⏸️ Available, not implemented |
+| **Medication Reminders** | WorkManager | ⏸️ Available, not implemented |
 
 ---
 
 *Document Created: January 14, 2026*
-*Last Updated: February 24, 2026 — Full rewrite: unified Firebase + Kotlin/Compose architecture*
+*Last Updated: February 2026 — All components implemented, updated actual versions and project structure*
 *Project: MediScan - AI-Powered Prescription Digitization*
+*Repository: [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)*
