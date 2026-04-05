@@ -1,7 +1,7 @@
 # 🏗️ System Design: MediScan
 ## AI-Powered Prescription Digitization & Smart Medicine Management System
 
-> **Last Updated:** February 2026 — Final architecture (Kotlin/Compose + Firebase + FastAPI) — **ALL COMPONENTS IMPLEMENTED ✅**
+> **Last Updated:** April 2026 — Final architecture (Kotlin/Compose + Firebase + FastAPI) — **ALL COMPONENTS IMPLEMENTED ✅** — **AI Backend deployed to Railway Cloud ☁️**
 
 ---
 
@@ -41,7 +41,7 @@
                           ┌─────────────────────────────┐
                           │     ⚡ FASTAPI BACKEND       │
                           │   (AI Extraction Server)     │
-                          │      Port: 8000              │
+                          │ ☁️ Railway Cloud (HTTPS)     │
                           ├─────────────────────────────┤
                           │  🔍 Quality Checker          │
                           │  🎯 YOLOv8s (9 classes)      │
@@ -57,7 +57,7 @@
 | Single app or separate apps? | **Single APK** with role-based UI | Simpler to maintain, shared auth logic |
 | Where to store user data? | **Firebase Firestore** (cloud) | Real-time sync, offline cache, free tier, no server setup |
 | Where to store images? | **Firebase Storage** | Secured by Firebase Auth UID, 5GB free |
-| Where to run AI? | **FastAPI server** (local machine or cloud) | GPU needed for YOLO + PaddleOCR, too heavy for mobile |
+| Where to run AI? | **FastAPI server** (Railway Cloud or local) | GPU needed for YOLO + PaddleOCR, too heavy for mobile. Deployed to Railway for universal access. |
 | Auth system? | **Firebase Auth** only | Native Android SDK, Google Sign-In built-in, no custom JWT needed |
 | Image input? | **CameraX + Gallery picker** | Dual input for flexibility — camera for new photos, gallery for existing |
 | Image caching? | **LRU memory cache** | PrescriptionImageCache (50 images, 100MB) avoids redundant Firebase downloads |
@@ -127,7 +127,7 @@ app/src/main/java/com/mediscan/app/
 │
 ├── core/
 │   ├── constants/
-│   │   └── ApiEndpoints.kt             # Dynamic base URL (emulator/physical auto-detect)
+│   │   └── ApiEndpoints.kt             # Dynamic base URL (cloud/emulator/physical, USE_CLOUD flag)
 │   ├── theme/
 │   │   ├── Theme.kt                    # Material 3 Theme (MediScanTheme)
 │   │   ├── Color.kt                    # Color palette (gradient indigo/blue)
@@ -397,11 +397,12 @@ app/src/main/java/com/mediscan/app/
 │  AI Stack:                                                              │
 │  ┌────────────────────────────────────────────────────────────────┐    │
 │  │  • YOLOv8s (Ultralytics)    - Field detection (9 classes)      │    │
-│  │  • PaddleOCR 3.2.2          - Text recognition (English)       │    │
+│  │  • PaddleOCR 2.9.1          - Text recognition (English)       │    │
+│  │  • PaddlePaddle 2.6.2       - PaddleOCR backend (CPU build)    │    │
 │  │  • ResNet18                 - Image quality classification      │    │
 │  │  • OpenCV 4.x               - Image preprocessing              │    │
 │  │  • PyTorch 2.5.1            - Deep learning framework           │    │
-│  │  • GPU: MPS (Apple Silicon) / CUDA (NVIDIA) / CPU fallback     │    │
+│  │  • GPU: MPS (Apple Silicon) / CUDA (NVIDIA) / CPU (Railway)    │    │
 │  └────────────────────────────────────────────────────────────────┘    │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -504,7 +505,7 @@ app/src/main/java/com/mediscan/app/
 
 ```
   ANDROID APP                    FASTAPI BACKEND           FIREBASE
-  (Kotlin/Compose)               (Local Machine)
+  (Kotlin/Compose)               (Railway Cloud / Local)
       │                             │                         │
       │  1. User captures photo     │                         │
       │     using CameraX           │                         │
@@ -574,23 +575,27 @@ app/src/main/java/com/mediscan/app/
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                    CURRENT DEVELOPMENT SETUP ✅                           │
+│                    PRODUCTION SETUP (Railway Cloud) ✅                    │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
-│  Your Machine (Backend — Apple Silicon Mac with MPS)                    │
+│  Railway Cloud (AI Backend — Hobby Plan $5/month)                       │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │  • FastAPI + Uvicorn                    Port: 8000              │   │
-│  │  • YOLOv8s + ResNet18 (MPS GPU)        Metal Performance       │   │
-│  │  • PaddleOCR (CPU)                     Shaders acceleration    │   │
-│  │  • Auto-detects: CUDA → MPS → CPU                              │   │
+│  │  • FastAPI + Uvicorn (Docker container, Python 3.11-slim)       │   │
+│  │  • YOLOv8s + ResNet18 (CPU inference)                           │   │
+│  │  • PaddleOCR 2.9.1 + PaddlePaddle 2.6.2 (CPU)                  │   │
+│  │  • URL: https://capstone-production-59e8.up.railway.app/        │   │
+│  │  • Resources: Up to 48 vCPU, 48 GB RAM, 5 GB storage           │   │
+│  │  • Auto-deploy on git push to main branch                       │   │
+│  │  • HTTPS with automatic SSL/TLS certificates                    │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
-│                              ↕ HTTP (WiFi / same network)              │
-│  Physical Android Device / Emulator                                     │
+│                              ↕ HTTPS (any network / anywhere)          │
+│  Android Device / Emulator                                              │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │  • MediScan Kotlin app                                          │   │
-│  │  • Emulator: http://10.0.2.2:8000 (auto-detected)              │   │
-│  │  • Physical: http://10.136.147.203:8000 (current IP)            │   │
+│  │  • ApiEndpoints.kt: USE_CLOUD = true (default)                  │   │
+│  │  • CLOUD_URL: https://capstone-production-59e8.up.railway.app/  │   │
 │  │  • OkHttp timeouts: 30s connect, 90s read, 90s write           │   │
+│  │  • Works on ANY network (no same-WiFi requirement)              │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                              ↕ HTTPS                                   │
 │  Firebase (Cloud — Free Tier)                                           │
@@ -599,6 +604,25 @@ app/src/main/java/com/mediscan/app/
 │  │  • Firestore: 1GB storage, 50K reads/day                ✅     │   │
 │  │  • Storage: 5GB, 1GB/day download                        ✅     │   │
 │  │  • Messaging (FCM): available                            🔜     │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+├─────────────────────────────────────────────────────────────────────────┤
+│                    LOCAL DEVELOPMENT SETUP (Optional)                     │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Developer Machine (Apple Silicon Mac with MPS, or NVIDIA with CUDA)    │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  • FastAPI + Uvicorn                    Port: 8000              │   │
+│  │  • YOLOv8s + ResNet18 (MPS/CUDA GPU)   Faster inference         │   │
+│  │  • PaddleOCR (CPU)                     PaddlePaddle limitation  │   │
+│  │  • Set USE_CLOUD = false in ApiEndpoints.kt                     │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                              ↕ HTTP (WiFi / same network)              │
+│  Android Device / Emulator                                              │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │  • Emulator: http://10.0.2.2:8000 (auto-detected)              │   │
+│  │  • Physical: http://<local_ip>:8000 (configure in ApiEndpoints) │   │
+│  │  • Requires same WiFi network as dev machine                    │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -669,9 +693,9 @@ app/src/main/java/com/mediscan/app/
 | **Loading UI** | Shimmer 1.3.2 | ✅ **Done** |
 | **EXIF Handling** | ExifInterface 1.3.7 | ✅ **Done** (gallery rotation) |
 | **Secure Storage** | EncryptedSharedPreferences + fallback | ✅ **Done** |
-| **AI Backend** | FastAPI v6.1 (MPS/CUDA/CPU) | ✅ **Done** |
+| **AI Backend** | FastAPI v6.1 (Railway Cloud / CPU) | ✅ **Done** — Deployed to Railway |
 | **YOLO v6** | YOLOv8s (9 classes, 98.6% mAP50) | ✅ **Done** |
-| **OCR** | PaddleOCR 3.2.2 (English) | ✅ **Done** |
+| **OCR** | PaddleOCR 2.9.1 + PaddlePaddle 2.6.2 (English) | ✅ **Done** |
 | **Quality Checker** | ResNet18 + Laplacian (80%) | ✅ **Done** |
 | **Local DB** | Room (SQLite) | ⏸️ Not implemented (Firestore offline cache used instead) |
 | **Push Notifications** | FCM (Firebase Cloud Messaging) | ⏸️ Available, not implemented |
@@ -680,6 +704,6 @@ app/src/main/java/com/mediscan/app/
 ---
 
 *Document Created: January 14, 2026*
-*Last Updated: February 2026 — All components implemented, updated actual versions and project structure*
+*Last Updated: April 2026 — Railway cloud deployment, PaddleOCR 2.9.1, USE_CLOUD flag, HTTPS connection*
 *Project: MediScan - AI-Powered Prescription Digitization*
 *Repository: [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)*

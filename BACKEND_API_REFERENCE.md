@@ -1,6 +1,6 @@
 # 🔌 MediScan — Backend API Reference
 
-> **Status:** ✅ Backend is **COMPLETE and WORKING**. The Android app is fully integrated and connects to this server for AI prescription extraction.
+> **Status:** ✅ Backend is **COMPLETE and WORKING**. Deployed to **Railway Cloud** (Hobby Plan). The Android app is fully integrated and connects via HTTPS for AI prescription extraction.
 
 ---
 
@@ -10,13 +10,20 @@
 |----------|-------|
 | **Framework** | FastAPI (Python) |
 | **Version** | 6.1.0 |
-| **Default Port** | 8000 |
+| **Default Port** | 8000 (local) / 443 (Railway HTTPS) |
+| **Cloud URL** | `https://capstone-production-59e8.up.railway.app/` |
+| **Hosting** | Railway Cloud — Hobby Plan ($5/month, 48 GB RAM) |
 | **AI Pipeline** | Quality Check (ResNet18) → YOLOv8s (9-class) → PaddleOCR (English) → Spatial Grouping |
-| **Docs UI** | `http://localhost:8000/docs` (Swagger) |
-| **GPU Acceleration** | CUDA (NVIDIA), MPS (Apple Silicon), or CPU fallback |
-| **Integration Status** | ✅ Fully connected to Android app via Retrofit2 + OkHttp |
+| **Docs UI** | `https://capstone-production-59e8.up.railway.app/docs` (Swagger) |
+| **GPU Acceleration** | CUDA (NVIDIA), MPS (Apple Silicon), or CPU fallback. Railway runs on CPU. |
+| **Integration Status** | ✅ Fully connected to Android app via Retrofit2 + OkHttp over HTTPS |
 
 ### How to Start the Server:
+
+**Option 1 — Cloud (Railway, recommended):**
+The server is already deployed and running at `https://capstone-production-59e8.up.railway.app/`. No setup needed — the Android app connects automatically when `USE_CLOUD = true` in `ApiEndpoints.kt`.
+
+**Option 2 — Local:**
 ```bash
 cd prescription_ai
 python backend/fastapi_app.py
@@ -31,21 +38,36 @@ The server automatically selects the best available compute device:
 
 > **Note:** PaddleOCR always runs on CPU regardless of GPU availability (PaddlePaddle framework limitation).
 
+### PaddleOCR Version Note:
+The server uses **PaddleOCR 2.9.1** with **PaddlePaddle 2.6.2** (CPU build). These versions were chosen for Docker/Railway compatibility — PaddlePaddle 3.x had a PIR compiler bug (`NotImplementedError`) on Intel CPUs with oneDNN in Docker containers, causing OCR to silently return empty text. The downgrade uses the same PP-OCRv4 models with no accuracy loss.
+
+### Railway Cloud Deployment:
+| Property | Value |
+|----------|-------|
+| **Platform** | Railway.app (Hobby Plan) |
+| **Cost** | $5/month |
+| **Resources** | Up to 48 vCPU, 48 GB RAM, 5 GB storage |
+| **Container** | Docker (Python 3.11-slim, CPU-only) |
+| **URL** | `https://capstone-production-59e8.up.railway.app/` |
+| **HTTPS** | ✅ Automatic SSL/TLS by Railway |
+| **Auto-deploy** | Pushes to `main` branch trigger redeployment |
+
 ---
 
 ## 🌐 Connection from Android
 
-### Base URLs (Auto-Detected):
+### Base URLs (ApiEndpoints.kt):
 
-The Android app auto-detects whether it's running on an emulator or physical device via `ApiEndpoints.kt`:
+The Android app uses a three-way URL selection system in `ApiEndpoints.kt`:
 
-| Scenario | Base URL | Detection |
-|----------|----------|-----------|
-| **Android Emulator** | `http://10.0.2.2:8000/` | Auto-detected via `Build.FINGERPRINT` |
-| **Physical Device (WiFi)** | `http://10.136.147.203:8000/` | Current configured IP |
-| **Production** | `https://api.mediscan.com/` | Future: deployed server |
+| Scenario | Base URL | How Selected |
+|----------|----------|--------------|
+| **☁️ Cloud (Railway)** | `https://capstone-production-59e8.up.railway.app/` | `USE_CLOUD = true` (default, recommended) |
+| **Android Emulator** | `http://10.0.2.2:8000/` | `USE_CLOUD = false` + auto-detected via `Build.FINGERPRINT` |
+| **Physical Device (WiFi)** | `http://10.136.147.203:8000/` | `USE_CLOUD = false` + physical device detection |
 
-> **Current physical device IP:** `10.136.147.203` — update `PHYSICAL_DEVICE_IP` in `ApiEndpoints.kt` if your network changes.
+> **Current mode:** `USE_CLOUD = true` — the app connects to Railway cloud over HTTPS. No local server needed.  
+> To switch to local development, set `USE_CLOUD = false` in `ApiEndpoints.kt` and start the local FastAPI server.
 
 ### Android Network Requirements:
 
@@ -726,9 +748,24 @@ try {
 
 ## 🏃 Quick Start for Testing
 
+### Cloud (Railway — Recommended)
+
+1. **No server setup needed** — already deployed and running
+
+2. **Test health endpoint:**
+   ```bash
+   curl https://capstone-production-59e8.up.railway.app/health
+   ```
+
+3. **Test from Android (emulator or physical device):**
+   - Ensure `USE_CLOUD = true` in `ApiEndpoints.kt` (default)
+   - Run the app, take a photo — it connects over HTTPS automatically
+
+### Local (Development)
+
 1. **Start FastAPI server:**
    ```bash
-   cd N:\Capstone Project\prescription_ai
+   cd prescription_ai
    python backend/fastapi_app.py
    ```
 
@@ -740,12 +777,14 @@ try {
    ```
 
 4. **Test from Android Emulator:**
-   - Use `http://10.0.2.2:8000/` as base URL in Retrofit
+   - Set `USE_CLOUD = false` in `ApiEndpoints.kt`
+   - Use `http://10.0.2.2:8000/` as base URL (auto-detected)
    - Run the app, take a photo, watch Logcat for Retrofit logs
 
 ---
 
-*Document Created: February 24, 2026*
-*Last Updated: February 2026 — Added MPS/GPU support notes, updated connection info, reflected actual implementation*
-*Server Version: 6.1.0*
-*Status: Backend is COMPLETE and WORKING — Android app is FULLY INTEGRATED*
+*Document Created: February 24, 2026*  
+*Last Updated: April 2026 — Added Railway cloud deployment, updated PaddleOCR to 2.9.1, added USE_CLOUD flag, HTTPS connection*  
+*Server Version: 6.1.0*  
+*Deployment: Railway Cloud (Hobby Plan) — `https://capstone-production-59e8.up.railway.app/`*  
+*Status: Backend is COMPLETE and DEPLOYED — Android app is FULLY INTEGRATED via HTTPS*

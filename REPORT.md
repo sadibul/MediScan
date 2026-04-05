@@ -4,8 +4,8 @@
 
 > **Project Type:** Capstone Project  
 > **Platform:** Android (Kotlin / Jetpack Compose)  
-> **AI Backend:** FastAPI (Python) with YOLOv8s + PaddleOCR  
-> **Cloud Services:** Firebase (Auth, Firestore, Storage)  
+> **AI Backend:** FastAPI (Python) with YOLOv8s + PaddleOCR — Deployed to **Railway Cloud**  
+> **Cloud Services:** Firebase (Auth, Firestore, Storage) + Railway (AI Backend)  
 > **GitHub:** [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)
 
 ---
@@ -125,12 +125,12 @@ Patient reviews/edits in bottom sheet → Saves to Firebase
 
 The AI extraction pipeline requires a network connection to the FastAPI backend server. If the server is unreachable, prescription scanning is completely unavailable. There is no on-device ML model for even basic text extraction.
 
-### 3.2 Local-Only Backend
+### 3.2 Cloud Backend — CPU-Only Inference
 
-The FastAPI server runs on a local machine (not deployed to cloud). This means:
-- Patient and server must be on the **same network**
-- The server IP address must be manually updated in `ApiEndpoints.kt` when the network changes
-- No public-facing API endpoint for real-world deployment
+The FastAPI server is deployed to **Railway Cloud** (`https://capstone-production-59e8.up.railway.app/`), eliminating the previous local-only limitation. However, Railway runs on CPU-only infrastructure (no GPU), which means:
+- AI extraction takes longer (~8-12 seconds) compared to GPU inference (~2-4 seconds)
+- The $5/month Hobby Plan provides generous resources (48 GB RAM) but no GPU acceleration
+- `ApiEndpoints.kt` supports switching between cloud and local via the `USE_CLOUD` flag for development flexibility
 
 ### 3.3 English-Only OCR
 
@@ -260,6 +260,37 @@ else:
 ```
 This reduced inference time to ~3-5 seconds on MPS.
 
+### 4.9 PaddleOCR Silent Failure on Railway (PIR Compiler Bug)
+
+**Problem:** After deploying the FastAPI backend to Railway Cloud, YOLO detection worked perfectly (detecting 3+ fields), but PaddleOCR returned empty text (`"text": ""`) and `ocr_confidence: 0.0` for ALL detected fields. The app showed empty medication fields despite successful detection.
+
+**Root Cause:** PaddlePaddle 3.3.x introduced a new **PIR (Paddle Intermediate Representation) compiler** that throws a `NotImplementedError` on Intel CPUs with oneDNN (MKL-DNN) enabled in Docker containers. Railway uses Intel Xeon CPUs. The error was silently caught by a try/except block in PaddleOCR's inference engine, causing it to return an empty list instead of OCR results.
+
+**Solution:** Downgraded to **PaddlePaddle 2.6.2** (CPU build) + **PaddleOCR 2.9.1**, which use the older stable inference engine without PIR. Also added v2/v3 API auto-detection:
+```python
+# v3 API (PaddleOCR 3.x): result = engine.predict(image)
+# v2 API (PaddleOCR 2.x): result = engine.ocr(image, cls=True)
+# Auto-detect which API version is available
+try:
+    result = engine.predict(image)  # v3
+except AttributeError:
+    result = engine.ocr(image, cls=True)  # v2 fallback
+```
+**Impact:** Zero accuracy loss — same PP-OCRv4 models, same results, just a different inference engine version. The downgrade only affected the PaddlePaddle framework, not the OCR models themselves.
+
+### 4.10 Railway Cloud Deployment
+
+**Problem:** The university WiFi network was too restrictive for running the FastAPI server locally — Android devices couldn't connect to the local machine, making the app unusable outside the development environment.
+
+**Solution:** Deployed the entire AI backend to **Railway Cloud** (Hobby Plan, $5/month):
+1. Created a `Dockerfile` (Python 3.11-slim, CPU-only PyTorch and PaddlePaddle)
+2. Created `requirements.txt` with CPU-specific packages (torch+cpu, paddlepaddle)
+3. Created `railway.toml` for deployment configuration
+4. Created `.dockerignore` to exclude unnecessary files
+5. Connected GitHub repo to Railway for auto-deploy on push
+
+**Result:** The AI backend is now accessible from anywhere over HTTPS at `https://capstone-production-59e8.up.railway.app/`. The Android app connects automatically when `USE_CLOUD = true` in `ApiEndpoints.kt`.
+
 ---
 
 ## 5. Limitations
@@ -267,8 +298,8 @@ This reduced inference time to ~3-5 seconds on MPS.
 ### 5.1 Network Dependency
 
 | Aspect | Limitation |
-|--------|-----------|
-| **AI Extraction** | Requires FastAPI server on same network |
+|--------|----------|
+| **AI Extraction** | Requires internet connection to Railway Cloud server (works on any network) |
 | **Data Sync** | Requires internet for Firestore read/write |
 | **Image Upload** | Requires internet for Firebase Storage |
 | **Notifications** | Only work while app is in foreground (no FCM push) |
@@ -286,8 +317,9 @@ This reduced inference time to ~3-5 seconds on MPS.
 ### 5.3 Scalability Constraints
 
 | Aspect | Limitation |
-|--------|-----------|
-| **Backend** | Single server, no load balancing, no horizontal scaling |
+|--------|----------|
+| **Backend** | Single Railway container, no load balancing, no horizontal scaling |
+| **GPU** | Railway runs CPU-only — no GPU acceleration for AI inference |
 | **Concurrent Users** | One FastAPI instance can handle ~5-10 concurrent extractions |
 | **Storage** | Firebase free tier: 5GB storage, 1GB/day download |
 | **Database** | Firestore free tier: 50K reads/day, 20K writes/day |
@@ -295,10 +327,10 @@ This reduced inference time to ~3-5 seconds on MPS.
 
 ### 5.4 Security Limitations
 
-- FastAPI endpoints are **unauthenticated** — anyone on the network can send extraction requests
+- FastAPI endpoints are **unauthenticated** — anyone with the URL can send extraction requests
 - Firebase Security Rules need tightening for production
 - No rate limiting on the AI extraction endpoint
-- `usesCleartextTraffic=true` allows unencrypted HTTP (necessary for local development but insecure)
+- `usesCleartextTraffic=true` still enabled for local development fallback (Railway uses HTTPS, so cloud traffic is encrypted)
 
 ---
 
@@ -318,6 +350,7 @@ This reduced inference time to ~3-5 seconds on MPS.
 |----------|----------|---------|-------------|
 | **Windows/Linux + NVIDIA** | CUDA GPU | ✅ Full | Best (~2-4 sec/image) |
 | **macOS Apple Silicon** | MPS (Metal) | ✅ Partial | Good (~3-5 sec/image) |
+| **Railway Cloud (Intel Xeon)** | CPU only | ✅ Deployed | Moderate (~8-12 sec/image) |
 | **macOS Intel** | CPU only | ⚠️ Slow | Slow (~8-12 sec/image) |
 | **Any (no GPU)** | CPU | ⚠️ Slow | Slow (~8-12 sec/image) |
 
@@ -431,7 +464,8 @@ The generous read timeout (90s) accommodates slow CPU-only extraction.
 
 ### 9.1 Short-Term (Next Release)
 
-- [ ] **Cloud deployment** — Deploy FastAPI to AWS/GCP/Azure with GPU instance for public access
+- [x] **Cloud deployment** — ✅ **DONE** — Deployed to Railway Cloud (Hobby Plan, $5/month) at `https://capstone-production-59e8.up.railway.app/`
+- [ ] **GPU cloud instance** — Upgrade to a GPU-enabled cloud provider (AWS/GCP) for faster inference (~2-4 sec vs ~8-12 sec)
 - [ ] **FCM push notifications** — Notify patients of appointment confirmations, medication reminders even when app is closed
 - [ ] **Room database** — Implement full offline-first with Room + sync strategy
 - [ ] **Unit tests** — Add ViewModel, Repository, and utility function tests
@@ -461,13 +495,15 @@ MediScan successfully demonstrates the feasibility of AI-powered prescription di
 
 **Key achievements:**
 - Complete Android app with 28 screens serving both patients and doctors
-- Real-time AI extraction with sub-5-second response times on GPU
+- Real-time AI extraction with sub-5-second response times on GPU (8-12 sec on Railway CPU)
+- **Cloud-deployed AI backend** on Railway — accessible from anywhere over HTTPS
 - Comprehensive Firebase integration for auth, database, and storage
 - Modern Compose UI with consistent design language
 - Dual image input (camera + gallery) with robust format handling
+- Successfully diagnosed and resolved a silent PaddleOCR PIR compiler bug in Docker
 
 **Key areas for improvement:**
-- Cloud deployment for production readiness
+- GPU cloud instance for faster AI inference
 - Multi-language OCR support for broader accessibility
 - Offline capabilities with on-device ML
 - Automated testing for long-term maintainability
@@ -476,6 +512,7 @@ The project demonstrates strong full-stack mobile development skills, AI/ML inte
 
 ---
 
-*Report Generated: February 2026*  
+*Report Generated: April 2026*  
 *Project: MediScan — AI-Powered Prescription Digitization*  
+*Deployment: Railway Cloud — `https://capstone-production-59e8.up.railway.app/`*  
 *Repository: [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)*

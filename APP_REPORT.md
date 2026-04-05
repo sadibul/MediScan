@@ -207,11 +207,12 @@ app/src/main/java/com/mediscan/app/
 
 ### 3.3 API Endpoints
 
-**`ApiEndpoints.kt`** dynamically selects the base URL:
-- **Emulator:** `http://10.0.2.2:8000/` (Android emulator → host loopback)
-- **Physical device:** `http://10.136.147.203:8000/` (current WiFi IP)
+**`ApiEndpoints.kt`** dynamically selects the base URL using a three-way selection system:
+- **☁️ Cloud (Railway):** `https://capstone-production-59e8.up.railway.app/` — used when `USE_CLOUD = true` (default, recommended)
+- **Emulator:** `http://10.0.2.2:8000/` (Android emulator → host loopback) — used when `USE_CLOUD = false`
+- **Physical device:** `http://10.136.147.203:8000/` (current WiFi IP) — used when `USE_CLOUD = false`
 
-Detection uses `Build.FINGERPRINT`, `Build.MODEL`, and `Build.MANUFACTURER` to identify emulators.
+Detection uses `Build.FINGERPRINT`, `Build.MODEL`, and `Build.MANUFACTURER` to identify emulators when not using cloud mode.
 
 Also defines Firestore collection names (`users`, `prescriptions`, `appointments`, `notifications`, `reminders`) and Firebase Storage paths.
 
@@ -689,10 +690,11 @@ Modal bottom sheet that displays AI extraction results:
 
 ## 11. AI Extraction Pipeline
 
-### 11.1 Backend Architecture (FastAPI)
+### 11.1 Backend Architecture (FastAPI — Railway Cloud)
 
 ```
-FastAPI Server (Port 8000)
+FastAPI Server (Railway Cloud — HTTPS)
+URL: https://capstone-production-59e8.up.railway.app/
     │
     ├── /health — Health check endpoint
     ├── /check-quality-base64 — Quick quality check
@@ -717,7 +719,7 @@ Input Image (JPEG base64)
     │   diagnosis, test
     └── Returns: class, bbox coordinates, confidence
     ↓
-[Stage 3] PaddleOCR (English)
+[Stage 3] PaddleOCR 2.9.1 (English)
     ├── Crops each detected region
     ├── 3-attempt strategy per region:
     │   1. Raw crop → OCR
@@ -742,7 +744,7 @@ Input Image (JPEG base64)
 | **mAP50** | 98.6% |
 | **Model Size** | ~64 MB |
 | **Input Size** | 640×640 (auto-resized) |
-| **Framework** | Ultralytics (PyTorch) |
+| **Framework** | Ultralytics (PyTorch) — CPU on Railway, MPS/CUDA on local |
 
 ### 11.4 Android ↔ Backend Communication
 
@@ -1059,6 +1061,7 @@ service firebase.storage {
 
 ---
 
-*Documentation Generated: February 2026*  
+*Documentation Generated: April 2026*  
 *Project: MediScan — AI-Powered Prescription Digitization*  
+*AI Backend: Railway Cloud — `https://capstone-production-59e8.up.railway.app/`*  
 *Repository: [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)*
