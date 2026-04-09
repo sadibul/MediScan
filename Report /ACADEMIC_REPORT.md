@@ -8,7 +8,11 @@
 
 **Name                                            	   ID**
 
-   Sadibul Islam Sadi                                              2021-2-60-XXX
+   Sadibul Islam Sadib                                           2021-1-60-141
+
+   Md Touhidul Islam Alif                                        2021-1-60-142
+
+   Md. Ashikul Islam                                             2021-1-60-048
 
  
 
@@ -55,7 +59,7 @@
 
  
 
-I, Sadibul Islam Sadi, hereby declare that the work presented in this capstone project report is the outcome of the investigation performed by me under the supervision of [Supervisor Name], [Designation], Department of Computer Science and Engineering, East West University. I also declare that no part of this project has been or is being submitted elsewhere for the award of any degree or diploma, except for publication.  
+We, Sadibul Islam Sadib, Md Touhidul Islam Alif, and Md. Ashikul Islam, hereby declare that the work presented in this capstone project report is the outcome of the investigation performed by us under the supervision of [Supervisor Name], [Designation], Department of Computer Science and Engineering, East West University. We also declare that no part of this project has been or is being submitted elsewhere for the award of any degree or diploma, except for publication.  
  
 
                 	Countersigned                                                                	Signature
@@ -65,9 +69,17 @@ I, Sadibul Islam Sadi, hereby declare that the work presented in this capstone p
 . . . . . . . . . . . . . . . . . . . . . . . .                                    	. . . . . . . . . . . . . . . . . . . . . . . .  
  
 
-	[Supervisor Name]                                       	       	Sadibul Islam Sadi
+	[Supervisor Name]                                       	       	Sadibul Islam Sadib
 
-     	**Supervisor**                                                        	 	2021-2-60-XXX  
+     	**Supervisor**                                                        	 	2021-1-60-141  
+
+     	                                                                    	 	Md Touhidul Islam Alif
+
+     	                                                                    	 	2021-1-60-142  
+
+     	                                                                    	 	Md. Ashikul Islam
+
+     	                                                                    	 	2021-1-60-048  
 
  
 
@@ -85,7 +97,7 @@ I, Sadibul Islam Sadi, hereby declare that the work presented in this capstone p
 
  
 
-The capstone project report entitled " **MediScan: An AI-Powered Prescription Digitization and Smart Medicine Management System**" is submitted by Sadibul Islam Sadi to the Department of Computer Science and Engineering, East West University, Dhaka, Bangladesh and is accepted for the partial fulfillment of the requirement for the degree of Bachelor of Science in Computer Science and Engineering on ( 	/     /     	).
+The capstone project report entitled " **MediScan: An AI-Powered Prescription Digitization and Smart Medicine Management System**" is submitted by Sadibul Islam Sadib, Md Touhidul Islam Alif, and Md. Ashikul Islam to the Department of Computer Science and Engineering, East West University, Dhaka, Bangladesh and is accepted for the partial fulfillment of the requirement for the degree of Bachelor of Science in Computer Science and Engineering on ( 	/     /     	).
 
  
 
@@ -131,10 +143,10 @@ Prescriptions remain the primary communication medium between physicians and pat
    
  
 
-As it is true for everyone, I have also arrived at this point of achieving a goal in my life through various interactions with and help from other people. However, written words are often elusive and harbour diverse interpretations even in one's mother language. Therefore, I would not like to make efforts to find the best words to express my thankfulness other than simply listing those people who have contributed to this project in an essential way. This work was carried out in the Department of Computer Science and Engineering at East West University, Bangladesh.  
-I would first like to thank God Almighty from the bottom of my heart for all of His blessings. I also want to express my gratitude to [Supervisor Name], my supervisor, who provided me with this opportunity and introduced me to the field of AI-powered healthcare systems. Without them, this work would not have been feasible. Their inspirational words, perceptive advice, and unwavering support throughout my B.Sc. program were both greatly appreciated and indispensable.  
-I would also like to acknowledge the patients and pharmacies in Bangladesh who allowed me to collect real prescription images for training the AI model. Their contribution was fundamental to the success of this project.  
-Finally, I would like to thank all those who have shown their constant support and friendship in various ways, directly or indirectly related to my academic life. I will remember them in my heart and hope to find a more appropriate place to acknowledge them in the future.
+As it is true for everyone, we have also arrived at this point of achieving a goal in our lives through various interactions with and help from other people. However, written words are often elusive and harbour diverse interpretations even in one's mother language. Therefore, we would not like to make efforts to find the best words to express our thankfulness other than simply listing those people who have contributed to this project in an essential way. This work was carried out in the Department of Computer Science and Engineering at East West University, Bangladesh.  
+We would first like to thank God Almighty from the bottom of our hearts for all of His blessings. We also want to express our gratitude to [Supervisor Name], our supervisor, who provided us with this opportunity and introduced us to the field of AI-powered healthcare systems. Without them, this work would not have been feasible. Their inspirational words, perceptive advice, and unwavering support throughout our B.Sc. program were both greatly appreciated and indispensable.  
+We would also like to acknowledge the patients and pharmacies in Bangladesh who allowed us to collect real prescription images for training the AI model. Their contribution was fundamental to the success of this project.  
+Finally, we would like to thank all those who have shown their constant support and friendship in various ways, directly or indirectly related to our academic life. We will remember them in our hearts and hope to find a more appropriate place to acknowledge them in the future.
 
  
 
@@ -146,7 +158,11 @@ Acknowledgments                                                                 
 
  
 
-                                                                                                                      	Sadibul Islam Sadi
+                                                                                                                      	Sadibul Islam Sadib
+
+                                                                                                                      	Md Touhidul Islam Alif
+
+                                                                                                                      	Md. Ashikul Islam
 
  
 
@@ -514,7 +530,7 @@ The project follows industry-standard software engineering practices: MVVM archi
 
 **RQ9.** Which practices should be followed in order to function well as an individual and a team member in order to achieve the Capstone Project's objectives? (PO9)
 
-This capstone project was developed as an individual effort, requiring self-management across multiple domains: AI model training, backend development, mobile application development, cloud deployment, and documentation. Effective time management, systematic debugging, and iterative development practices were essential. Communication with the supervisor for feedback and guidance was maintained throughout the process.
+This capstone project was developed as a collaborative team of three members: Sadibul Islam Sadib (lead developer — AI pipeline, Android application, backend deployment), Md Touhidul Islam Alif, and Md. Ashikul Islam. The team divided responsibilities across the multiple domains of the project — AI model training, backend development, mobile application development, cloud deployment, and documentation. Regular team communication, task tracking, and code integration were essential to maintaining project coherence. Communication with the supervisor for feedback and guidance was maintained throughout the process.
 
  
 
@@ -1088,7 +1104,7 @@ To estimate the cost of deploying MediScan as a real-world product, we consider 
 
 ▪ **Project complexity:** Rated 4 out of 5 — the system involves multi-domain engineering (AI, mobile, cloud), real-time image processing, and complex spatial algorithms.
 
-▪ **Development team experience:** Single developer with intermediate experience in AI/ML and mobile development.
+▪ **Development team experience:** Team of three developers with intermediate experience in AI/ML, Android development, and backend engineering.
 
 **Direct Cost Analysis:**
 
