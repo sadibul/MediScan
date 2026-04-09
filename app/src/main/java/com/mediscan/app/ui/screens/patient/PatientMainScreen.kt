@@ -1,5 +1,11 @@
 package com.mediscan.app.ui.screens.patient
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
@@ -18,11 +24,18 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -34,10 +47,15 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mediscan.app.core.theme.MediBlue
 import com.mediscan.app.core.theme.TextSecondary
+import com.mediscan.app.core.utils.NetworkResult
+import com.mediscan.app.data.model.Reminder
 import com.mediscan.app.ui.screens.patient.docs.DocsScreen
 import com.mediscan.app.ui.screens.patient.docs.PrescriptionDetailScreen
 import com.mediscan.app.ui.screens.patient.docs.PrescriptionDetailViewModel
+import com.mediscan.app.ui.screens.patient.home.AddReminderDialog
 import com.mediscan.app.ui.screens.patient.home.PatientHomeScreen
+import com.mediscan.app.ui.screens.patient.home.ReminderChoiceDialog
+import com.mediscan.app.ui.screens.patient.home.ViewRemindersDialog
 import com.mediscan.app.ui.screens.patient.medicine.BuyMedicineScreen
 import com.mediscan.app.ui.screens.notifications.NotificationsScreen
 import com.mediscan.app.ui.screens.patient.orders.DoctorOrdersScreen
@@ -49,6 +67,7 @@ import com.mediscan.app.ui.viewmodel.AuthViewModel
 import com.mediscan.app.ui.viewmodel.DocsViewModel
 import com.mediscan.app.ui.viewmodel.NotificationViewModel
 import com.mediscan.app.ui.viewmodel.PatientViewModel
+import com.mediscan.app.ui.viewmodel.ReminderViewModel
 import com.mediscan.app.ui.viewmodel.ScanViewModel
 
 // Bottom nav tab routes (internal to patient flow)
@@ -100,6 +119,141 @@ fun PatientMainScreen(
     val authViewModel: AuthViewModel = hiltViewModel()
     val scanViewModel: ScanViewModel = hiltViewModel()
     val docsViewModel: DocsViewModel = hiltViewModel()
+    val reminderViewModel: ReminderViewModel = hiltViewModel()
+    val context = LocalContext.current
+
+    // --- Reminder dialog states ---
+    var showReminderChoice by remember { mutableStateOf(false) }
+    var showViewReminders by remember { mutableStateOf(false) }
+    var showAddEditReminder by remember { mutableStateOf(false) }
+    var editingReminder by remember { mutableStateOf<Reminder?>(null) }
+
+    val reminderSaveState by reminderViewModel.saveState.collectAsState()
+    val reminderUpdateState by reminderViewModel.updateState.collectAsState()
+    val remindersState by reminderViewModel.reminders.collectAsState()
+
+    // Load reminders on first composition
+    LaunchedEffect(Unit) {
+        reminderViewModel.loadReminders()
+    }
+
+    // Request notification permission on Android 13+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (!granted) {
+            Toast.makeText(context, "Notification permission is required for reminders", Toast.LENGTH_LONG).show()
+        }
+    }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val permission = Manifest.permission.POST_NOTIFICATIONS
+            if (ContextCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(permission)
+            }
+        }
+    }
+
+    // Handle save result
+    LaunchedEffect(reminderSaveState) {
+        when (reminderSaveState) {
+            is NetworkResult.Success -> {
+                Toast.makeText(context, "Reminder saved successfully!", Toast.LENGTH_SHORT).show()
+                showAddEditReminder = false
+                editingReminder = null
+                reminderViewModel.loadReminders()
+                reminderViewModel.resetSaveState()
+            }
+            is NetworkResult.Error -> {
+                Toast.makeText(context, "Failed to save reminder", Toast.LENGTH_SHORT).show()
+                reminderViewModel.resetSaveState()
+            }
+            else -> {}
+        }
+    }
+
+    // Handle update result
+    LaunchedEffect(reminderUpdateState) {
+        when (reminderUpdateState) {
+            is NetworkResult.Success -> {
+                Toast.makeText(context, "Reminder updated successfully!", Toast.LENGTH_SHORT).show()
+                showAddEditReminder = false
+                editingReminder = null
+                reminderViewModel.loadReminders()
+                reminderViewModel.resetUpdateState()
+            }
+            is NetworkResult.Error -> {
+                Toast.makeText(context, "Failed to update reminder", Toast.LENGTH_SHORT).show()
+                reminderViewModel.resetUpdateState()
+            }
+            else -> {}
+        }
+    }
+
+    // 1) Choice dialog: View Reminders or Add New
+    if (showReminderChoice) {
+        ReminderChoiceDialog(
+            onDismiss = { showReminderChoice = false },
+            onViewReminders = {
+                showReminderChoice = false
+                showViewReminders = true
+            },
+            onAddNew = {
+                showReminderChoice = false
+                editingReminder = null
+                showAddEditReminder = true
+            },
+        )
+    }
+
+    // 2) View Reminders list
+    if (showViewReminders) {
+        ViewRemindersDialog(
+            remindersState = remindersState,
+            onDismiss = { showViewReminders = false },
+            onEdit = { reminder ->
+                showViewReminders = false
+                editingReminder = reminder
+                showAddEditReminder = true
+            },
+            onDelete = { reminder ->
+                reminderViewModel.deleteReminder(reminder.id, context)
+                reminderViewModel.loadReminders()
+            },
+            onAddNew = {
+                showViewReminders = false
+                editingReminder = null
+                showAddEditReminder = true
+            },
+        )
+    }
+
+    // 3) Add or Edit reminder
+    if (showAddEditReminder) {
+        AddReminderDialog(
+            onDismiss = {
+                showAddEditReminder = false
+                editingReminder = null
+            },
+            onSave = { reminder ->
+                if (editingReminder != null) {
+                    reminderViewModel.updateReminder(reminder, context)
+                } else {
+                    reminderViewModel.saveReminder(reminder, context)
+                }
+                showAddEditReminder = false
+                editingReminder = null
+            },
+            existingReminder = editingReminder,
+            onBack = if (editingReminder != null) {
+                {
+                    showAddEditReminder = false
+                    editingReminder = null
+                    showViewReminders = true
+                }
+            } else null,
+        )
+    }
 
     Scaffold(
         bottomBar = {
@@ -127,6 +281,9 @@ fun PatientMainScreen(
                     onNavigateToDoctorDetail = onNavigateToDoctorDetail,
                     onNavigateToNotifications = {
                         nestedNavController.navigate(PatientTabs.NOTIFICATIONS)
+                    },
+                    onReminderClick = {
+                        showReminderChoice = true
                     },
                 )
             }

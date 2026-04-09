@@ -150,6 +150,7 @@ fun DoctorMainScreen(
                 // Trigger data load
                 androidx.compose.runtime.LaunchedEffect(patientId) {
                     doctorViewModel.loadPatientPrescriptions(patientId)
+                    doctorViewModel.loadPatientReminders(patientId)
                 }
                 PatientRecordsScreen(
                     viewModel = doctorViewModel,

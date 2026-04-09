@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,13 +105,61 @@ fun DoctorAppointmentsScreen(
     }
 
     var selectedAppointment by remember { mutableStateOf<Appointment?>(null) }
+    var pendingDetailAppointment by remember { mutableStateOf<Appointment?>(null) }
+    var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
+
+    // ── Cancel Confirmation Dialog ──
+    appointmentToCancel?.let { appointment ->
+        AlertDialog(
+            onDismissRequest = { appointmentToCancel = null },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(20.dp),
+            title = {
+                Text(
+                    "Cancel Appointment?",
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A237E),
+                )
+            },
+            text = {
+                Text(
+                    "Are you sure you want to cancel the appointment with ${appointment.patientName.ifBlank { "this patient" }}?",
+                    color = TextSecondary,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.cancelAppointment(appointment.id)
+                        appointmentToCancel = null
+                    },
+                ) {
+                    Text("Yes, Cancel", color = ErrorRed, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { appointmentToCancel = null }) {
+                    Text("No, Keep", color = Color(0xFF1A237E))
+                }
+            },
+        )
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF4F6FB))
     ) {
-        // ── PatientDetailSheet ──
+        // ── Pending Patient Detail Dialog (simple info only) ──
+        pendingDetailAppointment?.let { appointment ->
+            PendingPatientDetailDialog(
+                appointment = appointment,
+                viewModel = viewModel,
+                onDismiss = { pendingDetailAppointment = null },
+            )
+        }
+
+        // ── PatientDetailSheet (confirmed — full with prescription) ──
         selectedAppointment?.let { appointment ->
             PatientDetailSheet(
                 appointment = appointment,
@@ -274,11 +323,15 @@ fun DoctorAppointmentsScreen(
                                 AppointmentCard(
                                     appointment = appointment,
                                     onAccept = { viewModel.acceptAppointment(appointment.id) },
-                                    onCancel = { viewModel.cancelAppointment(appointment.id) },
+                                    onCancel = { appointmentToCancel = appointment },
                                     onComplete = { viewModel.completeAppointment(appointment.id) },
                                     onViewPatient = {
                                         viewModel.loadPatientProfile(appointment.patientId)
-                                        selectedAppointment = appointment
+                                        if (appointment.status == "scheduled") {
+                                            pendingDetailAppointment = appointment
+                                        } else {
+                                            selectedAppointment = appointment
+                                        }
                                     },
                                 )
                             }
@@ -353,7 +406,7 @@ private fun AppointmentCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (appointment.status == "confirmed") {
+                if (appointment.status in listOf("confirmed", "scheduled")) {
                     Modifier.clickable { onViewPatient() }
                 } else Modifier
             ),
@@ -516,6 +569,220 @@ private fun AppointmentCard(
                                 Text("Cancel", color = ErrorRed, fontWeight = FontWeight.SemiBold)
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Pending Patient Detail Dialog — simple info modal for scheduled appointments
+// ═══════════════════════════════════════════════════════════
+@Composable
+private fun PendingPatientDetailDialog(
+    appointment: Appointment,
+    viewModel: DoctorViewModel,
+    onDismiss: () -> Unit,
+) {
+    val patientProfileState by viewModel.patientProfile.collectAsState()
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                // ── Dark gradient header ──
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(Color(0xFF1A237E), Color(0xFF303F9F), Color(0xFF3F51B5))
+                            )
+                        )
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(
+                            "Patient Details",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                        )
+                        IconButton(onClick = onDismiss) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Default.Cancel, null,
+                                    tint = Color.White, modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── Content ──
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp)
+                ) {
+                    // Patient avatar + name
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    Brush.linearGradient(listOf(Color(0xFF3F51B5), Color(0xFF5C6BC0)))
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            if (!appointment.patientProfileImageUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = appointment.patientProfileImageUrl,
+                                    contentDescription = "Patient photo",
+                                    modifier = Modifier.size(52.dp).clip(CircleShape),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            } else {
+                                val initials = appointment.patientName
+                                    .split(" ").take(2)
+                                    .mapNotNull { it.firstOrNull()?.uppercase() }
+                                    .joinToString("").ifEmpty { "P" }
+                                Text(initials, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                appointment.patientName.ifBlank { "Patient" },
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1A1A2E),
+                            )
+                            if (!appointment.complaint.isNullOrBlank()) {
+                                Text(
+                                    "Reason: ${appointment.complaint}",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFF9E9E9E),
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color(0xFFEEEEEE))
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Health stats
+                    when (patientProfileState) {
+                        is NetworkResult.Loading -> {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    color = Color(0xFF3F51B5),
+                                )
+                            }
+                        }
+                        is NetworkResult.Success -> {
+                            val patient = (patientProfileState as NetworkResult.Success<com.mediscan.app.data.model.User>).data
+                            val age = patient.dateOfBirth?.let {
+                                try {
+                                    val formats = listOf("yyyy-MM-dd", "dd/MM/yyyy", "MM/dd/yyyy", "dd-MM-yyyy")
+                                    var birth: java.util.Date? = null
+                                    for (fmt in formats) {
+                                        try {
+                                            birth = java.text.SimpleDateFormat(fmt, java.util.Locale.getDefault()).parse(it)
+                                            if (birth != null) break
+                                        } catch (_: Exception) {}
+                                    }
+                                    if (birth == null) return@let null
+                                    val diff = System.currentTimeMillis() - birth.time
+                                    (diff / (1000L * 60 * 60 * 24 * 365.25)).toInt()
+                                } catch (_: Exception) { null }
+                            }
+
+                            // 2x2 grid — centered label + value
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                if (age != null) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text("Age", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                        Text("$age yrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                    }
+                                }
+                                if (!patient.bloodGroup.isNullOrBlank()) {
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text("Blood", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                        Text(patient.bloodGroup, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                    }
+                                }
+                            }
+                            val hasHeight = !patient.height.isNullOrBlank()
+                            val hasWeight = !patient.weight.isNullOrBlank()
+                            if (hasHeight || hasWeight) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                ) {
+                                    if (hasHeight) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                        ) {
+                                            Text("Height", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                            Text("${patient.height} ft", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                        }
+                                    }
+                                    if (hasWeight) {
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                        ) {
+                                            Text("Weight", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                            Text("${patient.weight} kg", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        is NetworkResult.Error -> {
+                            Text("Could not load details", fontSize = 12.sp, color = ErrorRed)
+                        }
+                        else -> {}
                     }
                 }
             }

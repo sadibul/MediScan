@@ -2,37 +2,20 @@ package com.mediscan.app.core.constants
 
 import android.os.Build
 
-/**
- * API endpoint constants for the FastAPI backend server.
- *
- * The FastAPI server handles AI prescription extraction only.
- * All user data, auth, and storage go directly through Firebase.
- *
- * How it works:
- * - On Android Emulator: automatically uses 10.0.2.2 (maps to host PC's localhost)
- * - On a real phone: uses your Mac's IP on the same WiFi/hotspot network
- *
- * ⚠️ FOR UNIVERSITY DEMO:
- * 1. Turn on phone hotspot, connect Mac to it
- * 2. Find Mac's IP (run: ipconfig getifaddr en0)
- * 3. Change PHYSICAL_DEVICE_IP below to that IP
- * 4. Start server: cd Capstone && python -m uvicorn main:app --host 0.0.0.0 --port 8000
- */
+
 object ApiEndpoints {
 
-    // ┌─────────────────────────────────────────────────┐
-    // │  ⬇️ CHANGE THIS to your Mac's WiFi/Hotspot IP  │
-    // │  Run in terminal: ipconfig getifaddr en0        │
-    // └─────────────────────────────────────────────────┘
-    private const val PHYSICAL_DEVICE_IP = "10.141.178.203"
+    // ─── Cloud Server (Railway) ─────────────────────────────────
+    // Always-on cloud URL — works from anywhere, any network
+    private const val CLOUD_URL = "https://capstone-production-59e8.up.railway.app/"
 
+    // ─── Local Server (for development/testing only) ────────────
+    // Set USE_CLOUD = false to switch back to local Mac server
+    private const val USE_CLOUD = true
+    private const val PHYSICAL_DEVICE_IP = "10.136.147.203"
     private const val PORT = "8000"
     private const val EMULATOR_IP = "10.0.2.2"
 
-    /**
-     * Auto-detect: if running on emulator → use 10.0.2.2
-     * If running on real phone → use the physical device IP above
-     */
     private val isEmulator: Boolean
         get() = (Build.FINGERPRINT.startsWith("generic")
                 || Build.FINGERPRINT.startsWith("unknown")
@@ -44,7 +27,9 @@ object ApiEndpoints {
                 || Build.PRODUCT.contains("emulator"))
 
     val BASE_URL: String
-        get() = if (isEmulator) {
+        get() = if (USE_CLOUD) {
+            CLOUD_URL
+        } else if (isEmulator) {
             "http://$EMULATOR_IP:$PORT/"
         } else {
             "http://$PHYSICAL_DEVICE_IP:$PORT/"

@@ -3,6 +3,7 @@ package com.mediscan.app.ui.screens.doctor.appointments
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +12,10 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -25,10 +28,12 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.BubbleChart
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Medication
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -72,6 +77,7 @@ import com.mediscan.app.core.theme.TextSecondary
 import com.mediscan.app.core.theme.WarningOrange
 import com.mediscan.app.core.utils.NetworkResult
 import com.mediscan.app.data.model.Prescription
+import com.mediscan.app.data.model.Reminder
 import com.mediscan.app.ui.components.common.MediButton
 import com.mediscan.app.ui.viewmodel.DoctorViewModel
 import kotlinx.coroutines.delay
@@ -121,8 +127,10 @@ fun PatientRecordsScreen(
     onNavigateBack: () -> Unit,
 ) {
     val prescriptionsState by viewModel.patientPrescriptions.collectAsState()
+    val remindersState by viewModel.patientReminders.collectAsState()
     var showPieChart by remember { mutableStateOf(false) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var selectedReminder by remember { mutableStateOf<Reminder?>(null) }
     val scope = rememberCoroutineScope()
 
     // Available years from data
@@ -404,6 +412,14 @@ fun PatientRecordsScreen(
                                 }
                             }
 
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // ── Patient Current Medicine ──
+                            PatientCurrentMedicineCard(
+                                remindersState = remindersState,
+                                onReminderClick = { selectedReminder = it },
+                            )
+
                             Spacer(modifier = Modifier.height(32.dp))
                         }
                     }
@@ -413,6 +429,360 @@ fun PatientRecordsScreen(
             }
         }
     }
+
+    // Medicine Detail Dialog
+    selectedReminder?.let { reminder ->
+        MedicineDetailDialog(
+            reminder = reminder,
+            onDismiss = { selectedReminder = null },
+        )
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// Patient Current Medicine Card
+// ═══════════════════════════════════════════════════
+
+@Composable
+private fun PatientCurrentMedicineCard(
+    remindersState: NetworkResult<List<Reminder>>,
+    onReminderClick: (Reminder) -> Unit,
+) {
+    val activeCount = when (remindersState) {
+        is NetworkResult.Success -> remindersState.data.size
+        else -> 0
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header row — title + active badge
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    "Patient Current Medicine",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A2E),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+                // Active count badge
+                if (activeCount > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF009688).copy(alpha = 0.1f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "$activeCount active",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF009688),
+                            maxLines = 1,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Divider
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color(0xFFEEEEEE))
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            when (remindersState) {
+                is NetworkResult.Loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    }
+                }
+
+                is NetworkResult.Success -> {
+                    val reminders = remindersState.data
+                    if (reminders.isEmpty()) {
+                        Text(
+                            "No active medicine reminders",
+                            fontSize = 13.sp,
+                            color = TextSecondary,
+                            modifier = Modifier.padding(vertical = 8.dp),
+                        )
+                    } else {
+                        reminders.forEachIndexed { index, reminder ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Min)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { onReminderClick(reminder) }
+                                    .background(Color(0xFF009688).copy(alpha = 0.04f)),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                // Left accent bar
+                                Box(
+                                    modifier = Modifier
+                                        .width(4.dp)
+                                        .fillMaxHeight()
+                                        .background(Color(0xFF009688), RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp))
+                                )
+                                // Content
+                                Row(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            reminder.medicineName,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF1A1A2E),
+                                        )
+                                        if (reminder.description.isNotBlank()) {
+                                            Text(
+                                                reminder.description,
+                                                fontSize = 12.sp,
+                                                color = TextSecondary,
+                                                maxLines = 1,
+                                            )
+                                        }
+                                    }
+                                    // Frequency badge
+                                    Box(
+                                        modifier = Modifier
+                                            .background(Color(0xFF009688).copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    ) {
+                                        Text(
+                                            "${reminder.medicineTimes.size}x/day",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color(0xFF009688),
+                                        )
+                                    }
+                                }
+                            }
+                            if (index < reminders.lastIndex) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                        }
+                    }
+                }
+
+                is NetworkResult.Error -> {
+                    Text(
+                        "Failed to load medicines",
+                        fontSize = 13.sp,
+                        color = ErrorRed,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+
+                else -> {
+                    Text(
+                        "No active medicine reminders",
+                        fontSize = 13.sp,
+                        color = TextSecondary,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// Medicine Detail Dialog
+// ═══════════════════════════════════════════════════
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MedicineDetailDialog(
+    reminder: Reminder,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF009688).copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.Medication,
+                                contentDescription = null,
+                                tint = Color(0xFF009688),
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Medicine Details",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1A1A2E),
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = Color(0xFFEEEEE))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Medicine Name
+                DetailRow(label = "Medicine", value = reminder.medicineName)
+
+                // Description
+                if (reminder.description.isNotBlank()) {
+                    DetailRow(label = "Description", value = reminder.description)
+                }
+
+                // Duration
+                DetailRow(label = "Duration", value = "${reminder.timeDurationDays} Days")
+
+                // Times
+                Text(
+                    "Medicine Times",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextSecondary,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    reminder.medicineTimes.forEach { time ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF009688).copy(alpha = 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                formatTimeTo12Hour(time),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF00695C),
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Days of Week
+                Text(
+                    "Days of Week",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextSecondary,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    reminder.daysOfWeek.forEach { day ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF3F51B5).copy(alpha = 0.1f))
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                day,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF3F51B5),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Close button
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.End),
+                ) {
+                    Text("Close", fontWeight = FontWeight.SemiBold, color = MediBlue)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        Text(
+            label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextSecondary,
+        )
+        Text(
+            value,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF1A1A2E),
+        )
+    }
+    Spacer(modifier = Modifier.height(8.dp))
+}
+
+/** Convert "HH:mm" to "h:mm AM/PM" for display */
+private fun formatTimeTo12Hour(time24: String): String {
+    val parts = time24.split(":")
+    if (parts.size != 2) return time24
+    val hour = parts[0].toIntOrNull() ?: return time24
+    val minute = parts[1].toIntOrNull() ?: return time24
+    val amPm = if (hour < 12) "AM" else "PM"
+    val hour12 = when {
+        hour == 0 -> 12
+        hour > 12 -> hour - 12
+        else -> hour
+    }
+    return String.format(java.util.Locale.US, "%d:%02d %s", hour12, minute, amPm)
 }
 
 // ═══════════════════════════════════════════════════

@@ -59,16 +59,18 @@ app/src/main/java/com/mediscan/app/
 │   │   ├── DoctorOrder.kt                  # Doctor-written prescription model
 │   │   ├── ExtractionResult.kt             # AI extraction response model
 │   │   ├── Medication.kt                   # Single medication data class
-│   │   ├── Notification.kt                 # Notification data class
+│   │   ├── Notification.kt                 # Notification data class (@field:JvmField fix)
 │   │   ├── Prescription.kt                 # Prescription data class
+│   │   ├── Reminder.kt                     # Medicine reminder data class
 │   │   └── User.kt                         # User data class (patient + doctor fields)
 │   ├── remote/
 │   │   └── FastApiService.kt               # Retrofit interface (health, quality, extract)
 │   └── repository/
 │       ├── AppointmentRepository.kt         # Firestore appointment CRUD
 │       ├── AuthRepository.kt                # Firebase Auth operations
-│       ├── NotificationRepository.kt        # Firestore notification CRUD
+│       ├── NotificationRepository.kt        # Firestore notification CRUD + real-time listener
 │       ├── PrescriptionRepository.kt        # Firestore + FastAPI + Storage operations
+│       ├── ReminderRepository.kt            # Firestore reminder CRUD
 │       └── UserRepository.kt                # Firestore user profile CRUD
 │
 ├── di/
@@ -93,6 +95,7 @@ app/src/main/java/com/mediscan/app/
     │   ├── DoctorViewModel.kt               # Doctor dashboard state
     │   ├── NotificationViewModel.kt         # Real-time notification listener
     │   ├── PatientViewModel.kt              # Patient dashboard state
+    │   ├── ReminderViewModel.kt             # Medicine reminder CRUD + alarm scheduling
     │   └── ScanViewModel.kt                 # Camera/gallery capture + AI extraction
     │
     └── screens/
@@ -104,7 +107,8 @@ app/src/main/java/com/mediscan/app/
         ├── patient/
         │   ├── PatientMainScreen.kt         # Bottom nav scaffold (Home/Scan/Docs/Profile)
         │   ├── home/
-        │   │   └── PatientHomeScreen.kt     # Dashboard with quick actions + recent Rx
+        │   │   ├── PatientHomeScreen.kt     # Dashboard with quick actions + recent Rx
+        │   │   └── AddReminderDialog.kt     # Reminder choice, view list, add/edit dialogs
         │   ├── scan/
         │   │   ├── ScanScreen.kt            # Camera + Gallery capture (741 lines)
         │   │   └── CameraPreviewScreen.kt   # CameraX preview composable
@@ -138,8 +142,14 @@ app/src/main/java/com/mediscan/app/
         │   └── PatientAppointmentsScreen.kt # Patient's appointments list
         ├── hospitals/
         │   └── NearbyHospitalsScreen.kt     # Google Maps with location markers
-        └── notifications/
-            └── NotificationsScreen.kt       # Notification list + mark read
+        ├── notifications/
+        │   └── NotificationsScreen.kt       # Notification list + mark read
+        └── ...
+│
+├── reminder/
+│   ├── ReminderAlarmReceiver.kt             # BroadcastReceiver for alarm notifications
+│   ├── ReminderScheduler.kt                 # AlarmManager scheduling helper
+│   └── BootReceiver.kt                      # Re-schedules reminders after device reboot
 ```
 
 ---
@@ -181,7 +191,7 @@ app/src/main/java/com/mediscan/app/
 | **Play Services Location** | 21.3.0 | Location services | NearbyHospitalsScreen |
 | **Navigation Compose** | 2.8.5 | Screen routing | NavGraph |
 | **Room** | 2.6.1 | Local SQLite | (Declared, not implemented) |
-| **WorkManager** | 2.10.0 | Background tasks | (Available for reminders) |
+| **WorkManager** | 2.10.0 | Background tasks | (Available, AlarmManager used for reminders) |
 | **Security Crypto** | 1.1.0-alpha06 | Encrypted storage | PreferencesManager |
 | **Accompanist Permissions** | 0.36.0 | Runtime permissions | ScanScreen, NearbyHospitalsScreen |
 | **Shimmer** | 1.3.2 | Loading animations | DocsScreen, Appointments, etc. |
@@ -445,6 +455,7 @@ Notification bell icon with unread count badge.
 - **Shimmer loading** while fetching
 - Each appointment card shows: patient name, date/time, complaint, status
 - Status management: Pending → Confirmed → Completed / Cancelled
+- **Cancel confirmation dialog** — doctors must confirm before cancelling an appointment (themed AlertDialog with "Yes, Cancel" / "No, Keep" buttons)
 - Tap patient name → `PatientDetailSheet` (bottom sheet with patient info)
 - View Records button → `PatientRecordsScreen`
 
@@ -459,6 +470,8 @@ Notification bell icon with unread count badge.
 - Views a specific patient's prescription history
 - Similar layout to patient's DocsScreen but from doctor's perspective
 - Allows doctor to review previous prescriptions and medications
+- **Patient Current Medicine** card — shows active medicine reminders with frequency badges
+- Tap a medicine → detail dialog showing times, days, and duration
 
 ### 6.5 DoctorRecordsScreen.kt (Charts & Analytics)
 
@@ -530,14 +543,18 @@ Features:
 
 ```
 Firestore Collection: notifications/{notificationId}
-├── userId: String          (recipient)
+├── recipientId: String     (recipient UID)
+├── senderId: String
+├── senderName: String
 ├── title: String
 ├── message: String
 ├── type: String            (appointment, prescription, system)
-├── isRead: Boolean
-├── createdAt: Timestamp
-└── relatedId: String?      (appointmentId, prescriptionId)
+├── isRead: Boolean         (⚠️ stored as "isRead" via @field:JvmField)
+├── appointmentId: String?
+├── createdAt: Long
 ```
+
+> **Important:** The `isRead` field uses `@field:JvmField` annotation in the Kotlin data class to prevent the JavaBean naming convention from stripping the `is` prefix (which would cause Firestore to serialize it as `"read"` instead of `"isRead"`).
 
 ### 8.2 Real-Time Listener
 
@@ -545,13 +562,12 @@ Firestore Collection: notifications/{notificationId}
 ```kotlin
 fun startObserving(userId: String, userType: String) {
     firestore.collection("notifications")
-        .whereEqualTo("userId", userId)
-        .orderBy("createdAt", Query.Direction.DESCENDING)
+        .whereEqualTo("recipientId", userId)
         .addSnapshotListener { snapshot, error -> ... }
 }
 ```
 
-**Unread count** is computed as a `StateFlow<Int>` and displayed as a red badge on the notification bell icon in both `PatientMainScreen` and `DoctorMainScreen`.
+**Unread count** is computed via `toObjects(Notification::class.java)` with client-side filtering (`!isRead`), avoiding the need for a Firestore composite index. Displayed as a red dot badge on the notification bell icon in both `PatientMainScreen` and `DoctorMainScreen`.
 
 ### 8.3 NotificationsScreen.kt
 
@@ -567,6 +583,51 @@ Notifications are created in Firestore when:
 - Patient books an appointment → doctor gets notified
 - Doctor confirms/cancels appointment → patient gets notified
 - Doctor writes a prescription → patient gets notified
+
+---
+
+## 8.5 Medicine Reminder System
+
+A complete local alarm-based reminder system that notifies patients to take their medicines on time, even when the app is closed.
+
+### Architecture
+
+```
+Firestore Collection: reminders/{reminderId}
+├── patientId: String
+├── medicineName: String
+├── description: String
+├── timeDurationDays: Int
+├── medicineTimes: List<String>    (e.g. ["09:00", "19:00"])
+├── daysOfWeek: List<String>       (e.g. ["Sun", "Tue", "Thu"])
+├── startDate: Long
+├── isActive: Boolean
+└── createdAt: Long
+```
+
+### Components
+
+| Component | Purpose |
+|-----------|---------|
+| **Reminder.kt** | Data model stored in Firestore |
+| **ReminderRepository.kt** | Firestore CRUD (save, update, delete, getReminders, getActiveReminders) |
+| **ReminderViewModel.kt** | State management + alarm scheduling via `AlarmManager` |
+| **ReminderScheduler.kt** | Static helper for scheduling exact alarms for each day × time combination |
+| **ReminderAlarmReceiver.kt** | `BroadcastReceiver` that fires when alarm triggers — shows notification with sound |
+| **BootReceiver.kt** | Re-schedules all active reminders after device reboot |
+| **AddReminderDialog.kt** | Full-screen dialog UI with choice dialog, list view, and add/edit form |
+
+### User Flow
+
+1. Patient taps **Reminder** quick action → `ReminderChoiceDialog` (View Reminders / Add New)
+2. **Add New** → full-screen form: medicine name, description, duration, time picker, day selector
+3. On save → `ReminderViewModel` saves to Firestore + schedules `AlarmManager` exact alarms
+4. Alarm fires → `ReminderAlarmReceiver` shows a notification with sound/vibration
+5. On device reboot → `BootReceiver` re-fetches active reminders from Firestore and re-schedules alarms
+
+### Doctor View
+
+Doctors can view a patient's active reminders via the **Patient Current Medicine** card in `PatientRecordsScreen`, showing medicine name, frequency, and a detail dialog.
 
 ---
 

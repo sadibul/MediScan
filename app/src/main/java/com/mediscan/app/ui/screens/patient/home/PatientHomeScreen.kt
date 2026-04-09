@@ -28,7 +28,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.MedicalServices
@@ -106,6 +108,7 @@ fun PatientHomeScreen(
     onNavigateToBuyMedicine: () -> Unit = {},
     onNavigateToDoctorDetail: (doctorId: String, appointmentDateTime: Long?, appointmentComplaint: String?) -> Unit = { _, _, _ -> },
     onNavigateToNotifications: () -> Unit = {},
+    onReminderClick: () -> Unit = {},
 ) {
     val unreadCount by notificationViewModel.unreadCount.collectAsState()
     val userProfileState by viewModel.userProfile.collectAsState()
@@ -227,7 +230,8 @@ fun PatientHomeScreen(
                 onNavigateToDoctorSearch = onNavigateToDoctorSearch,
                 onNavigateToNearbyHospitals = onNavigateToNearbyHospitals,
                 onNavigateToDoctorOrders = onNavigateToDoctorOrders,
-                onNavigateToBuyMedicine = onNavigateToBuyMedicine
+                onNavigateToBuyMedicine = onNavigateToBuyMedicine,
+                onReminderClick = onReminderClick,
             )
         }
 
@@ -447,6 +451,7 @@ private fun QuickActionsGrid(
     onNavigateToNearbyHospitals: () -> Unit,
     onNavigateToDoctorOrders: () -> Unit,
     onNavigateToBuyMedicine: () -> Unit,
+    onReminderClick: () -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -491,6 +496,28 @@ private fun QuickActionsGrid(
                 topBarColor = Color(0xFF9C27B0),
                 modifier = Modifier.weight(1f),
                 onClick = onNavigateToDoctorOrders
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            QuickActionGridCard(
+                title = "Reminder",
+                subtitle = "Medicine schedule",
+                icon = Icons.Default.Alarm,
+                accentColor = Color(0xFF00796B),
+                accentColorLight = Color(0xFFE0F2F1),
+                topBarColor = Color(0xFF009688),
+                modifier = Modifier.weight(1f),
+                onClick = onReminderClick
+            )
+            QuickActionGridCard(
+                title = "Upcoming Features",
+                subtitle = "Stay tuned!",
+                icon = Icons.Default.Info,
+                accentColor = Color(0xFF546E7A),
+                accentColorLight = Color(0xFFECEFF1),
+                topBarColor = Color(0xFF78909C),
+                modifier = Modifier.weight(1f),
+                onClick = { /* Coming soon */ }
             )
         }
     }
@@ -643,7 +670,7 @@ private fun SectionHeader(title: String, onViewAll: () -> Unit) {
         )
         TextButton(onClick = onViewAll) {
             Text(
-                text = "View All →",
+                text = "View All",
                 color = MediBlue,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold

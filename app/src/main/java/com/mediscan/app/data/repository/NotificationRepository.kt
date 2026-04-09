@@ -54,7 +54,8 @@ class NotificationRepository @Inject constructor(
                 .whereEqualTo("recipientId", userId)
                 .get()
                 .await()
-            snapshot.documents.count { doc -> doc.getBoolean("isRead") == false }
+            // Use toObjects for correct deserialization of isRead
+            snapshot.toObjects(Notification::class.java).count { !it.isRead }
         } catch (_: Exception) {
             0
         }
@@ -64,15 +65,16 @@ class NotificationRepository @Inject constructor(
     fun observeUnreadCount(userId: String): Flow<Int> = callbackFlow {
         val listener = collection
             .whereEqualTo("recipientId", userId)
-            .whereEqualTo("isRead", false)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     android.util.Log.e("NotificationRepo", "observeUnreadCount error", error)
                     trySend(0)
                     return@addSnapshotListener
                 }
-                val unread = snapshot?.size() ?: 0
-                android.util.Log.d("NotificationRepo", "observeUnreadCount: $unread unread for user=$userId")
+                // Use toObjects for correct deserialization — handles isRead field name properly
+                val notifications = snapshot?.toObjects(Notification::class.java) ?: emptyList()
+                val unread = notifications.count { !it.isRead }
+                android.util.Log.d("NotificationRepo", "observeUnreadCount: $unread unread (total=${notifications.size}) for user=$userId")
                 trySend(unread)
             }
         awaitClose { listener.remove() }
@@ -81,9 +83,14 @@ class NotificationRepository @Inject constructor(
     /** Mark a single notification as read */
     suspend fun markAsRead(notificationId: String): NetworkResult<Unit> {
         return try {
-            collection.document(notificationId)
-                .update("isRead", true)
-                .await()
+            val docRef = collection.document(notificationId)
+            // Update both possible field names to handle any existing data
+            val updates = mutableMapOf<String, Any>()
+            val doc = docRef.get().await()
+            if (doc.contains("read")) updates["read"] = true
+            if (doc.contains("isRead")) updates["isRead"] = true
+            if (updates.isEmpty()) updates["isRead"] = true  // default
+            docRef.update(updates).await()
             NetworkResult.Success(Unit)
         } catch (e: Exception) {
             NetworkResult.Error(e.message ?: "Failed to mark notification as read")
@@ -97,13 +104,21 @@ class NotificationRepository @Inject constructor(
                 .whereEqualTo("recipientId", userId)
                 .get()
                 .await()
+            // Find unread docs — check both possible field names ("read" and "isRead")
             val unreadDocs = snapshot.documents.filter { doc ->
-                doc.getBoolean("isRead") == false
+                val readByIsRead = doc.getBoolean("isRead")
+                val readByRead = doc.getBoolean("read")
+                // Unread if either field is explicitly false, or both are null (never set)
+                (readByIsRead == false) || (readByRead == false) ||
+                    (readByIsRead == null && readByRead == null)
             }
             if (unreadDocs.isNotEmpty()) {
                 val batch = firestore.batch()
                 unreadDocs.forEach { doc ->
-                    batch.update(doc.reference, "isRead", true)
+                    // Update whichever field name exists, plus always set "isRead"
+                    val updates = mutableMapOf<String, Any>("isRead" to true)
+                    if (doc.contains("read")) updates["read"] = true
+                    batch.update(doc.reference, updates)
                 }
                 batch.commit().await()
             }

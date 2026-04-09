@@ -255,25 +255,19 @@ private fun ProfileContent(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         QuickStatItem(
-                            icon = Icons.Default.Height,
                             label = "Height",
                             value = user.height ?: "--",
                             unit = "ft",
-                            color = Color(0xFF3F51B5)
                         )
                         QuickStatItem(
-                            icon = Icons.Default.FitnessCenter,
+                            label = "Blood Group",
+                            value = user.bloodGroup ?: "--",
+                            unit = "",
+                        )
+                        QuickStatItem(
                             label = "Weight",
                             value = user.weight ?: "--",
                             unit = "kg",
-                            color = Color(0xFF43A047)
-                        )
-                        QuickStatItem(
-                            icon = Icons.Default.Bloodtype,
-                            label = "Blood",
-                            value = user.bloodGroup ?: "--",
-                            unit = "",
-                            color = Color(0xFFF44336)
                         )
                     }
                 }
@@ -301,7 +295,6 @@ private fun ProfileContent(
                     icon = Icons.Default.Edit,
                     iconTint = Color(0xFF3F51B5),
                     title = "Edit Profile",
-                    subtitle = "Update your personal information",
                     onClick = onNavigateToEditProfile
                 )
                 MenuDivider()
@@ -309,7 +302,6 @@ private fun ProfileContent(
                     icon = Icons.Default.Lock,
                     iconTint = Color(0xFF9C27B0),
                     title = "Change Password",
-                    subtitle = "Update your password",
                     onClick = onNavigateToChangePassword
                 )
                 MenuDivider()
@@ -317,7 +309,6 @@ private fun ProfileContent(
                     icon = Icons.Default.Notifications,
                     iconTint = Color(0xFFFF9800),
                     title = "Notification Settings",
-                    subtitle = "Manage your notifications",
                     onClick = { /* Future */ }
                 )
             }
@@ -340,18 +331,9 @@ private fun ProfileContent(
         ) {
             Column {
                 ProfileMenuItem(
-                    icon = Icons.Default.History,
-                    iconTint = Color(0xFF00BCD4),
-                    title = "Medical History",
-                    subtitle = "View your medical records",
-                    onClick = { /* Future */ }
-                )
-                MenuDivider()
-                ProfileMenuItem(
                     icon = Icons.AutoMirrored.Filled.Help,
                     iconTint = Color(0xFF607D8B),
                     title = "Help & Support",
-                    subtitle = "Get help and FAQs",
                     onClick = { /* Future */ }
                 )
                 MenuDivider()
@@ -359,7 +341,6 @@ private fun ProfileContent(
                     icon = Icons.Default.Policy,
                     iconTint = Color(0xFF795548),
                     title = "Terms & Privacy Policy",
-                    subtitle = "Read our policies",
                     onClick = { /* Future */ }
                 )
             }
@@ -382,7 +363,6 @@ private fun ProfileContent(
                 icon = Icons.AutoMirrored.Filled.Logout,
                 iconTint = ErrorRed,
                 title = "Logout",
-                subtitle = "Sign out of your account",
                 titleColor = ErrorRed,
                 onClick = onLogout
             )
@@ -397,39 +377,28 @@ private fun ProfileContent(
 // ═══════════════════════════════════════════════════════════
 @Composable
 private fun QuickStatItem(
-    icon: ImageVector,
     label: String,
     value: String,
     unit: String,
-    color: Color,
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            modifier = Modifier
-                .size(38.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(color.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, null, tint = color, modifier = Modifier.size(20.dp))
-        }
-        Spacer(modifier = Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 value,
-                fontSize = 16.sp,
+                fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF1A1A2E)
             )
             if (unit.isNotEmpty()) {
                 Text(
                     " $unit",
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     color = Color(0xFF9E9E9E),
                     modifier = Modifier.padding(bottom = 1.dp)
                 )
             }
         }
+        Spacer(modifier = Modifier.height(2.dp))
         Text(label, fontSize = 11.sp, color = Color(0xFF9E9E9E))
     }
 }
@@ -471,7 +440,7 @@ private fun ProfileMenuItem(
     icon: ImageVector,
     iconTint: Color,
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     titleColor: Color = Color(0xFF212121),
     onClick: () -> Unit,
 ) {
@@ -510,11 +479,13 @@ private fun ProfileMenuItem(
                     fontWeight = FontWeight.SemiBold,
                     color = titleColor
                 )
-                Text(
-                    text = subtitle,
-                    fontSize = 12.sp,
-                    color = Color(0xFF9E9E9E)
-                )
+                if (subtitle != null) {
+                    Text(
+                        text = subtitle,
+                        fontSize = 12.sp,
+                        color = Color(0xFF9E9E9E)
+                    )
+                }
             }
 
             Box(

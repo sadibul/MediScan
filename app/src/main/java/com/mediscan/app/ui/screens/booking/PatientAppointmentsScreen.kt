@@ -76,6 +76,7 @@ import com.mediscan.app.core.theme.TextSecondary
 import com.mediscan.app.core.theme.WarningOrange
 import com.mediscan.app.core.utils.DateUtils
 import com.mediscan.app.core.utils.NetworkResult
+import coil.compose.AsyncImage
 import com.mediscan.app.data.model.Appointment
 import com.mediscan.app.ui.viewmodel.BookingViewModel
 
@@ -341,7 +342,16 @@ private fun PatientAppointmentCard(
                                 .background(Brush.horizontalGradient(listOf(Color(0xFF1A237E), Color(0xFF3F51B5)))),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            if (!appointment.doctorProfileImageUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = appointment.doctorProfileImageUrl,
+                                    contentDescription = "Doctor photo",
+                                    modifier = Modifier.size(46.dp).clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                )
+                            } else {
+                                Text(initials, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            }
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {

@@ -142,6 +142,7 @@ class BookingViewModel @Inject constructor(
                 patientProfileImageUrl = patientProfileImageUrl,
                 doctorId = doctor.id,
                 doctorName = doctor.fullName,
+                doctorProfileImageUrl = doctor.profileImageUrl,
                 specialization = doctor.specialization ?: "",
                 dateTime = dateTimeMillis,
                 status = "scheduled",

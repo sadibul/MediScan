@@ -47,12 +47,12 @@ Patient reviews/edits in bottom sheet → Saves to Firebase
 
 | Metric | Count |
 |--------|-------|
-| **Kotlin Source Files** | 58 |
+| **Kotlin Source Files** | 65+ |
 | **Screens** | 28 |
-| **ViewModels** | 8 |
+| **ViewModels** | 9 |
 | **UI Components** | 7 |
-| **Data Models** | 7 |
-| **Repositories** | 5 |
+| **Data Models** | 8 |
+| **Repositories** | 6 |
 | **DI Modules** | 2 |
 | **Navigation Routes** | 22 |
 | **Third-Party Libraries** | 25+ |
@@ -101,7 +101,8 @@ Patient reviews/edits in bottom sheet → Saves to Firebase
 | **Appointment Booking** | Doctor search → detail → date/time selection → Firestore save |
 | **Doctor Analytics** | Vico charting library — bar charts for patient statistics |
 | **Nearby Hospitals** | Google Maps Compose with real-time location + markers |
-| **Notifications** | Firestore real-time listener with unread count badge |
+| **Notifications** | Firestore real-time listener with unread count badge (red dot on bell icon) |
+| **Medicine Reminders** | AlarmManager-based local reminders with sound notifications, auto-reschedule on reboot |
 | **Buy Medicine** | Product browsing UI for medicines |
 | **Doctor Orders** | Prescriptions written by doctors for their patients |
 | **Profile Management** | Edit profile, change password, view details for both roles |
@@ -145,7 +146,7 @@ While Room (SQLite) was planned in the original architecture, it was not impleme
 
 ### 3.5 No Push Notifications (FCM)
 
-Firebase Cloud Messaging was planned but not implemented. Notifications are implemented via Firestore real-time listeners, which only work while the app is in the foreground. Users don't receive push notifications when the app is closed.
+Firebase Cloud Messaging was planned but not implemented. In-app notifications are implemented via Firestore real-time listeners, which only work while the app is in the foreground. However, **medicine reminders** now use `AlarmManager` with exact alarms to deliver local notifications with sound even when the app is closed. A `BootReceiver` re-schedules all active reminders after device reboot.
 
 ### 3.6 No Automated Testing
 
@@ -291,6 +292,34 @@ except AttributeError:
 
 **Result:** The AI backend is now accessible from anywhere over HTTPS at `https://capstone-production-59e8.up.railway.app/`. The Android app connects automatically when `USE_CLOUD = true` in `ApiEndpoints.kt`.
 
+### 4.11 Notification Badge Not Showing (Firestore JavaBean Naming Bug)
+
+**Problem:** The red dot notification indicator on the bell icon always showed zero unread count, even when unread notifications existed in Firestore.
+
+**Root Cause:** Kotlin's JavaBean naming convention strips the `is` prefix from Boolean properties during serialization. The `isRead: Boolean` field in the `Notification` data class was being stored as `"read"` in Firestore instead of `"isRead"`. When the repository queried `getBoolean("isRead")`, it returned `null`, and `null == false` evaluates to `false` in Kotlin, so the unread count was always 0.
+
+**Solution:** Added `@field:JvmField` annotation on the `isRead` property to prevent the JavaBean naming convention from applying:
+```kotlin
+data class Notification(
+    // ...
+    @field:JvmField
+    val isRead: Boolean = false,
+    // ...
+)
+```
+Also switched to `toObjects(Notification::class.java)` deserialization with client-side filtering instead of raw field access, ensuring proper type-safe deserialization.
+
+### 4.12 Medicine Reminder Alarm Scheduling
+
+**Problem:** Patients needed to be reminded to take their medicines at specific times, even when the app was closed.
+
+**Solution:** Built a complete reminder system using Android's `AlarmManager`:
+1. **`ReminderScheduler`** calculates all alarm times for each day × time combination within the reminder duration
+2. **`AlarmManager.setExactAndAllowWhileIdle()`** schedules exact alarms that fire even in Doze mode
+3. **`ReminderAlarmReceiver`** (BroadcastReceiver) shows a high-priority notification with alarm sound
+4. **`BootReceiver`** re-schedules all active reminders from Firestore after device reboot
+5. Permissions: `SCHEDULE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `POST_NOTIFICATIONS`
+
 ---
 
 ## 5. Limitations
@@ -302,7 +331,7 @@ except AttributeError:
 | **AI Extraction** | Requires internet connection to Railway Cloud server (works on any network) |
 | **Data Sync** | Requires internet for Firestore read/write |
 | **Image Upload** | Requires internet for Firebase Storage |
-| **Notifications** | Only work while app is in foreground (no FCM push) |
+| **Notifications** | In-app notifications work via Firestore listeners (foreground only). Medicine reminders use AlarmManager (works when app is closed) |
 
 ### 5.2 AI Accuracy Constraints
 
@@ -475,7 +504,7 @@ The generous read timeout (90s) accommodates slow CPU-only extraction.
 
 - [ ] **Multi-language OCR** — Add Bengali, Hindi, Arabic script support via PaddleOCR language packs
 - [ ] **On-device ML** — Port a lightweight extraction model (TFLite/ONNX) for basic offline scanning
-- [ ] **Medication reminders** — WorkManager-based local alarms for dose schedules
+- [ ] **Medication reminders** — ~~WorkManager-based local alarms for dose schedules~~ ✅ **DONE** — Implemented with AlarmManager, BroadcastReceiver, BootReceiver, and Firestore persistence
 - [ ] **Doctor digital prescribing** — Let doctors write prescriptions digitally within the app
 - [ ] **Appointment video calls** — Integrate WebRTC or Twilio for telemedicine
 

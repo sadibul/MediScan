@@ -10,6 +10,7 @@ data class Appointment(
     val patientProfileImageUrl: String? = null,
     val doctorId: String = "",
     val doctorName: String = "",
+    val doctorProfileImageUrl: String? = null,
     val specialization: String = "",
     val dateTime: Long = 0L,
     val status: String = "scheduled",   // "scheduled", "confirmed", "completed", "cancelled"

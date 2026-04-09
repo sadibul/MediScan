@@ -93,6 +93,7 @@ dependencies {
     implementation(libs.camera.lifecycle)
     implementation(libs.camera.view)
     implementation(libs.concurrent.futures.ktx)
+    implementation(libs.exifinterface)
     implementation("com.google.guava:guava:32.1.3-android")
 
     // Coil (Image loading)

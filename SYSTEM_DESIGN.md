@@ -85,6 +85,7 @@
 │  • Book appointments           ✅  • Patient diagnosis history      ✅ │
 │  • Buy medicines (browse)      ✅  • Analytics dashboard (Vico)     ✅ │
 │  • Nearby hospitals (Maps)     ✅  • Appointment management         ✅ │
+│  • Medicine reminders          ✅  • View patient medicines         ✅ │
 │  • Profile management          ✅  • Profile management             ✅ │
 │  • Doctor orders (view)        ✅  • Notifications                  ✅ │
 │  • Notifications               ✅                                      │
@@ -111,14 +112,14 @@
 | **Navigation** | Navigation Compose | 2.8.5 | Screen routing with animations | ✅ |
 | **Charts** | Vico | 2.0.0-beta.2 | Doctor analytics (bar charts) | ✅ |
 | **Maps** | Google Maps Compose | 6.2.1 | Hospital/pharmacy finder | ✅ |
-| **Notifications** | Firestore Listeners | — | Real-time in-app notifications | ✅ |
+| **Notifications** | Firestore Real-time Listeners | — | Real-time in-app notifications | ✅ |
 | **Token Storage** | EncryptedSharedPreferences | 1.1.0-alpha06 | Secure local storage (with fallback) | ✅ |
 | **Serialization** | Gson | 2.11.0 | JSON parsing | ✅ |
 | **Permissions** | Accompanist Permissions | 0.36.0 | Camera + location permissions | ✅ |
 | **Loading UI** | Shimmer | 1.3.2 | Loading placeholder animations | ✅ |
 | **EXIF** | ExifInterface | 1.3.7 | Gallery image rotation correction | ✅ |
 
-#### Android Project Structure (Actual — 58 Kotlin files):
+#### Android Project Structure (Actual — 65+ Kotlin files):
 
 ```
 app/src/main/java/com/mediscan/app/
@@ -149,7 +150,8 @@ app/src/main/java/com/mediscan/app/
 │   │   ├── Appointment.kt              # Appointment data class
 │   │   ├── ExtractionResult.kt         # AI extraction response model
 │   │   ├── DoctorOrder.kt              # Doctor-written prescription
-│   │   └── Notification.kt             # Notification data class
+│   │   ├── Notification.kt             # Notification data class (@field:JvmField on isRead)
+│   │   └── Reminder.kt                 # Medicine reminder data class
 │   ├── remote/
 │   │   └── FastApiService.kt           # Retrofit interface (health, quality, extract)
 │   └── repository/
@@ -157,6 +159,7 @@ app/src/main/java/com/mediscan/app/
 │       ├── PrescriptionRepository.kt   # Firestore + FastAPI + Storage
 │       ├── AppointmentRepository.kt    # Firestore appointments
 │       ├── UserRepository.kt           # Firestore user profiles
+│       ├── ReminderRepository.kt       # Firestore reminder CRUD
 │       └── NotificationRepository.kt   # Firestore notifications + listener
 │
 ├── di/
@@ -171,6 +174,7 @@ app/src/main/java/com/mediscan/app/
     │   ├── DocsViewModel.kt            # Prescription list loading
     │   ├── DoctorViewModel.kt          # Doctor dashboard state
     │   ├── BookingViewModel.kt         # Doctor search + appointment booking
+    │   ├── ReminderViewModel.kt        # Medicine reminder CRUD + alarm scheduling
     │   └── NotificationViewModel.kt    # Real-time notification listener
     ├── screens/
     │   ├── splash/
@@ -181,6 +185,7 @@ app/src/main/java/com/mediscan/app/
     │   ├── patient/
     │   │   ├── PatientMainScreen.kt    # Bottom nav (Home/Scan/Docs/Profile)
     │   │   ├── home/PatientHomeScreen.kt
+    │   │   ├── home/AddReminderDialog.kt  # Reminder choice, list, add/edit
     │   │   ├── scan/ScanScreen.kt      # CameraX + Gallery (741 lines)
     │   │   ├── scan/CameraPreviewScreen.kt
     │   │   ├── docs/DocsScreen.kt      # Prescription history
@@ -471,9 +476,15 @@ app/src/main/java/com/mediscan/app/
 │  │  └── relatedId: String? (appointmentId/prescriptionId)          │   │
 │  │                                                                  │   │
 │  │  reminders/{reminderId}                                          │   │
-│  │  ├── patientId, prescriptionId, medicineName                    │   │
-│  │  ├── schedule, reminderTimes, isActive                          │   │
-│  │  └── createdAt: Timestamp                                       │   │
+│  │  ├── patientId: String                                          │   │
+│  │  ├── medicineName: String                                       │   │
+│  │  ├── description: String                                        │   │
+│  │  ├── timeDurationDays: Int                                      │   │
+│  │  ├── medicineTimes: List<String>  ("HH:mm" format)              │   │
+│  │  ├── daysOfWeek: List<String>     ("Sun", "Mon", etc.)          │   │
+│  │  ├── startDate: Long                                            │   │
+│  │  ├── isActive: Boolean                                          │   │
+│  │  └── createdAt: Long                                            │   │
 │  └─────────────────────────────────────────────────────────────────┘   │
 │                                                                         │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
@@ -679,9 +690,9 @@ app/src/main/java/com/mediscan/app/
 
 | Layer | Technology | Status |
 |-------|------------|--------|
-| **Android App** | Kotlin 2.0.21 + Jetpack Compose (Material 3) | ✅ **Done** (58 files, 28 screens) |
+| **Android App** | Kotlin 2.0.21 + Jetpack Compose (Material 3) | ✅ **Done** (65+ files, 28 screens) |
 | **Auth** | Firebase Auth (email + Google Sign-In) | ✅ **Done** |
-| **Cloud DB** | Firebase Firestore | ✅ **Done** (5 collections) |
+| **Cloud DB** | Firebase Firestore | ✅ **Done** (6 collections) |
 | **Image Storage** | Firebase Storage + LRU Cache | ✅ **Done** |
 | **HTTP Client** | Retrofit 2.11.0 + OkHttp 4.12.0 | ✅ **Done** |
 | **DI** | Hilt 2.53.1 (Dagger) | ✅ **Done** (2 modules) |
@@ -699,11 +710,11 @@ app/src/main/java/com/mediscan/app/
 | **Quality Checker** | ResNet18 + Laplacian (80%) | ✅ **Done** |
 | **Local DB** | Room (SQLite) | ⏸️ Not implemented (Firestore offline cache used instead) |
 | **Push Notifications** | FCM (Firebase Cloud Messaging) | ⏸️ Available, not implemented |
-| **Medication Reminders** | WorkManager | ⏸️ Available, not implemented |
+| **Medication Reminders** | AlarmManager + BroadcastReceiver + Firestore | ✅ **Done** (local alarm notifications) |
 
 ---
 
 *Document Created: January 14, 2026*
-*Last Updated: April 2026 — Railway cloud deployment, PaddleOCR 2.9.1, USE_CLOUD flag, HTTPS connection*
+*Last Updated: April 2026 — Railway cloud deployment, PaddleOCR 2.9.1, USE_CLOUD flag, HTTPS connection, Medicine Reminders system*
 *Project: MediScan - AI-Powered Prescription Digitization*
 *Repository: [https://github.com/sadibul/MediScan.git](https://github.com/sadibul/MediScan.git)*

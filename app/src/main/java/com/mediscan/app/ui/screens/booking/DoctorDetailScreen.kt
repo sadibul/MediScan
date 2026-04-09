@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Person
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -52,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -69,6 +74,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -507,8 +513,9 @@ private fun InfoRowStyled(
 }
 
 // ═══════════════════════════════════════════════════════════
-// Book Appointment Dialog
+// Book Appointment Dialog — BottomSheet Style
 // ═══════════════════════════════════════════════════════════
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BookAppointmentDialog(
     doctor: User,
@@ -530,7 +537,9 @@ private fun BookAppointmentDialog(
     val dateFormat = remember { SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault()) }
     val dateText = if (selectedDateMillis > 0) dateFormat.format(selectedDateMillis) else "Select Date"
     val timeText = if (selectedHour >= 0) {
-        String.format(Locale.getDefault(), "%02d:%02d", selectedHour, selectedMinute)
+        val amPm = if (selectedHour < 12) "AM" else "PM"
+        val h12 = if (selectedHour % 12 == 0) 12 else selectedHour % 12
+        String.format(Locale.getDefault(), "%d:%02d %s", h12, selectedMinute, amPm)
     } else "Select Time"
 
     val availableDayNames = doctor.availableDays ?: emptyList()
@@ -573,160 +582,315 @@ private fun BookAppointmentDialog(
 
     val isFormValid = selectedDateMillis > 0 && selectedHour >= 0 && dateError == null && timeError == null && complaint.trim().isNotBlank()
 
-    AlertDialog(
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
         onDismissRequest = { if (!isLoading) onDismiss() },
+        sheetState = sheetState,
         containerColor = Color.White,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Text("Book Appointment", fontWeight = FontWeight.Bold, color = Color(0xFF1A237E))
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        dragHandle = {
+            Box(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .background(Color.LightGray, RoundedCornerShape(2.dp))
+                )
+            }
         },
-        text = {
-            Column {
-                Text("with Dr. ${doctor.fullName}", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF3F51B5))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 32.dp),
+        ) {
+            // ── Gradient header card ──
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 8.dp)
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF1A237E), Color(0xFF3F51B5), Color(0xFF5C6BC0))),
+                        RoundedCornerShape(20.dp),
+                    )
+                    .padding(20.dp),
+            ) {
+                Column {
+                    Text(
+                        "Book Appointment",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        "with Dr. ${doctor.fullName}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.85f),
+                    )
 
-                if (!doctor.consultationFee.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .background(HealthGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 10.dp, vertical = 3.dp),
-                    ) {
-                        Text("Fee: ৳${doctor.consultationFee}", style = MaterialTheme.typography.labelMedium,
-                            color = HealthGreen, fontWeight = FontWeight.SemiBold)
+                    // Fee badge
+                    if (!doctor.consultationFee.isNullOrBlank()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 12.dp, vertical = 5.dp),
+                        ) {
+                            Text(
+                                "💳 Fee: ৳${doctor.consultationFee}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
-                }
 
-                // Availability info card
-                if (availableDayNames.isNotEmpty() || timeSlot != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Card(
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A237E).copy(alpha = 0.05f)),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text("📅 Availability", style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold, color = Color(0xFF1A237E))
-                            if (availableDayNames.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("Days: ${availableDayNames.joinToString(", ")}",
-                                    style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                            }
-                            if (timeSlot != null) {
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text("Time: ${doctor.availableTimeRange}",
-                                    style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    // Availability info
+                    if (availableDayNames.isNotEmpty() || timeSlot != null) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.Top) {
+                                Text("📅", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        "Availability",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Color.White,
+                                    )
+                                    if (availableDayNames.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            "Days: ${availableDayNames.joinToString(", ")}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                    if (timeSlot != null) {
+                                        Spacer(modifier = Modifier.height(1.dp))
+                                        Text(
+                                            "Time: ${doctor.availableTimeRange}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color.White.copy(alpha = 0.8f),
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = Color(0xFF1A237E).copy(alpha = 0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Date Picker
-                MediButton(
-                    text = dateText,
+            // ── Date & Time row ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Date picker button
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FC)),
                     onClick = {
-                        val c = Calendar.getInstance()
-                        DatePickerDialog(
-                            context,
-                            { _, year, month, day ->
-                                val picked = Calendar.getInstance().apply {
-                                    set(year, month, day, 0, 0, 0)
-                                    set(Calendar.MILLISECOND, 0)
-                                }
-                                if (allowedDaysOfWeek.isNotEmpty() &&
-                                    picked.get(Calendar.DAY_OF_WEEK) !in allowedDaysOfWeek
-                                ) {
-                                    dateError = "Dr. ${doctor.fullName} is not available on this day. Available: ${availableDayNames.joinToString(", ")}"
-                                    selectedDateMillis = 0L
-                                } else {
-                                    dateError = null
-                                    selectedDateMillis = picked.timeInMillis
-                                }
-                            },
-                            c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH),
-                        ).apply { datePicker.minDate = System.currentTimeMillis() }.show()
+                        if (!isLoading) {
+                            val c = Calendar.getInstance()
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, day ->
+                                    val picked = Calendar.getInstance().apply {
+                                        set(year, month, day, 0, 0, 0)
+                                        set(Calendar.MILLISECOND, 0)
+                                    }
+                                    if (allowedDaysOfWeek.isNotEmpty() &&
+                                        picked.get(Calendar.DAY_OF_WEEK) !in allowedDaysOfWeek
+                                    ) {
+                                        dateError = "Dr. ${doctor.fullName} is not available on this day. Available: ${availableDayNames.joinToString(", ")}"
+                                        selectedDateMillis = 0L
+                                    } else {
+                                        dateError = null
+                                        selectedDateMillis = picked.timeInMillis
+                                    }
+                                },
+                                c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH),
+                            ).apply { datePicker.minDate = System.currentTimeMillis() }.show()
+                        }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading,
-                )
-                if (dateError != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(dateError!!, style = MaterialTheme.typography.bodySmall, color = WarningOrange)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            "DATE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            letterSpacing = 1.sp,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            dateText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = if (selectedDateMillis > 0) Color(0xFF1A237E) else TextSecondary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Time Picker
-                MediButton(
-                    text = timeText,
+                // Time picker button
+                Card(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F9FC)),
                     onClick = {
-                        val initHour = timeSlot?.startHour ?: calendar.get(Calendar.HOUR_OF_DAY)
-                        val initMin = timeSlot?.startMinute ?: calendar.get(Calendar.MINUTE)
-                        TimePickerDialog(
-                            context,
-                            { _, hour, minute ->
-                                if (timeSlot != null) {
-                                    val selectedTotal = hour * 60 + minute
-                                    val startTotal = timeSlot.startHour * 60 + timeSlot.startMinute
-                                    val endTotal = timeSlot.endHour * 60 + timeSlot.endMinute
-                                    if (selectedTotal < startTotal || selectedTotal > endTotal) {
-                                        timeError = "Please select a time within ${doctor.availableTimeRange}"
-                                        selectedHour = -1
+                        if (!isLoading) {
+                            val initHour = timeSlot?.startHour ?: calendar.get(Calendar.HOUR_OF_DAY)
+                            val initMin = timeSlot?.startMinute ?: calendar.get(Calendar.MINUTE)
+                            TimePickerDialog(
+                                context,
+                                { _, hour, minute ->
+                                    if (timeSlot != null) {
+                                        val selectedTotal = hour * 60 + minute
+                                        val startTotal = timeSlot.startHour * 60 + timeSlot.startMinute
+                                        val endTotal = timeSlot.endHour * 60 + timeSlot.endMinute
+                                        if (selectedTotal < startTotal || selectedTotal > endTotal) {
+                                            timeError = "Please select a time within ${doctor.availableTimeRange}"
+                                            selectedHour = -1
+                                        } else {
+                                            timeError = null
+                                            selectedHour = hour
+                                            selectedMinute = minute
+                                        }
                                     } else {
                                         timeError = null
                                         selectedHour = hour
                                         selectedMinute = minute
                                     }
-                                } else {
-                                    timeError = null
-                                    selectedHour = hour
-                                    selectedMinute = minute
-                                }
-                            },
-                            initHour, initMin, false,
-                        ).show()
+                                },
+                                initHour, initMin, false,
+                            ).show()
+                        }
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isLoading,
-                )
-                if (timeError != null) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(timeError!!, style = MaterialTheme.typography.bodySmall, color = WarningOrange)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            "TIME",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            letterSpacing = 1.sp,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            timeText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = if (selectedHour >= 0) Color(0xFF1A237E) else TextSecondary,
+                            maxLines = 1,
+                        )
+                    }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Disease / Reason field
-                OutlinedTextField(
-                    value = complaint,
-                    onValueChange = { complaint = it; complaintError = it.trim().isBlank() },
-                    label = { Text("Disease / Reason *") },
-                    placeholder = { Text("e.g. fever, cold, headache") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    maxLines = 3,
-                    enabled = !isLoading,
-                    isError = complaintError,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = Color(0xFF3F51B5),
-                        unfocusedBorderColor = Color(0xFF1A237E).copy(alpha = 0.15f),
-                    ),
-                    supportingText = if (complaintError) {
-                        { Text("Please describe your disease or reason for visit", color = ErrorRed) }
-                    } else null,
+            // Error messages
+            if (dateError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    dateError!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WarningOrange,
+                    modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
-        },
-        confirmButton = {
-            if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp, color = Color(0xFF1A237E))
-            } else {
-                TextButton(
+            if (timeError != null) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    timeError!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = WarningOrange,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ── Disease / Reason field ──
+            Text(
+                "DISEASE / REASON *",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedTextField(
+                value = complaint,
+                onValueChange = { complaint = it; complaintError = it.trim().isBlank() },
+                placeholder = { Text("e.g. Chest pain, follow-up...", color = TextSecondary.copy(alpha = 0.6f)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                shape = RoundedCornerShape(14.dp),
+                maxLines = 3,
+                enabled = !isLoading,
+                isError = complaintError,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color(0xFF3F51B5),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    unfocusedContainerColor = Color(0xFFF8F9FC),
+                    focusedContainerColor = Color.White,
+                ),
+                supportingText = if (complaintError) {
+                    { Text("Please describe your disease or reason for visit", color = ErrorRed) }
+                } else null,
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ── Action buttons ──
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Cancel
+                Button(
+                    onClick = { if (!isLoading) onDismiss() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFF0F0F5),
+                        contentColor = TextSecondary,
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+                    enabled = !isLoading,
+                ) {
+                    Text("Cancel", fontWeight = FontWeight.SemiBold)
+                }
+
+                // Book Now
+                Button(
                     onClick = {
-                        if (complaint.trim().isBlank()) { complaintError = true; return@TextButton }
+                        if (complaint.trim().isBlank()) { complaintError = true; return@Button }
                         if (isFormValid) {
                             val combined = Calendar.getInstance().apply {
                                 timeInMillis = selectedDateMillis
@@ -737,17 +901,36 @@ private fun BookAppointmentDialog(
                             onBook(combined, complaint)
                         }
                     },
-                    enabled = isFormValid,
+                    modifier = Modifier
+                        .weight(1.5f)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF1A237E),
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFF1A237E).copy(alpha = 0.4f),
+                        disabledContentColor = Color.White.copy(alpha = 0.6f),
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                    enabled = isFormValid && !isLoading,
                 ) {
-                    Text("Book", fontWeight = FontWeight.Bold,
-                        color = if (isFormValid) Color(0xFF1A237E) else TextSecondary)
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = Color.White,
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Book Now", fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        },
-        dismissButton = {
-            if (!isLoading) {
-                TextButton(onClick = onDismiss) { Text("Cancel", color = TextSecondary) }
-            }
-        },
-    )
+        }
+    }
 }

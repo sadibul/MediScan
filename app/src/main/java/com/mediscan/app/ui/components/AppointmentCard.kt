@@ -30,9 +30,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.mediscan.app.core.theme.MediBlue
 import com.mediscan.app.core.theme.TextSecondary
 import com.mediscan.app.core.theme.WarningOrange
@@ -90,7 +92,7 @@ fun AppointmentCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.weight(1f)
                 ) {
-                    // Doctor initials avatar
+                    // Doctor avatar (photo or initials fallback)
                     Box(
                         modifier = Modifier
                             .size(42.dp)
@@ -98,16 +100,25 @@ fun AppointmentCard(
                             .background(Color(0xFF1A237E).copy(alpha = 0.1f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = appointment.doctorName
-                                .split(" ")
-                                .take(2)
-                                .joinToString("") { it.take(1) }
-                                .uppercase(),
-                            color = Color(0xFF1A237E),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp
-                        )
+                        if (!appointment.doctorProfileImageUrl.isNullOrBlank()) {
+                            AsyncImage(
+                                model = appointment.doctorProfileImageUrl,
+                                contentDescription = "Doctor photo",
+                                modifier = Modifier.size(42.dp).clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                            )
+                        } else {
+                            Text(
+                                text = appointment.doctorName
+                                    .split(" ")
+                                    .take(2)
+                                    .joinToString("") { it.take(1) }
+                                    .uppercase(),
+                                color = Color(0xFF1A237E),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {

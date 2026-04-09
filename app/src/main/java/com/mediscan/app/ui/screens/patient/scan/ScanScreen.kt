@@ -1,10 +1,13 @@
 package com.mediscan.app.ui.screens.patient.scan
 
 import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +38,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,9 +77,17 @@ import com.mediscan.app.ui.viewmodel.ScanViewModel
 fun ScanScreen(viewModel: ScanViewModel) {
     val scanState by viewModel.scanState.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
+    val context = LocalContext.current
 
     // Camera permission
     val cameraPermission = rememberPermissionState(Manifest.permission.CAMERA)
+
+    // Gallery picker — delegates all heavy work to ViewModel on IO thread
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { viewModel.processGalleryImage(it, context) }
+    }
 
     // Reset to initial after successful save
     LaunchedEffect(saveState) {
@@ -98,6 +112,9 @@ fun ScanScreen(viewModel: ScanViewModel) {
                             } else {
                                 cameraPermission.launchPermissionRequest()
                             }
+                        },
+                        onChooseFromGallery = {
+                            galleryLauncher.launch("image/*")
                         },
                         isCameraGranted = cameraPermission.status.isGranted,
                         shouldShowRationale = cameraPermission.status.shouldShowRationale,
@@ -213,6 +230,7 @@ fun ScanScreen(viewModel: ScanViewModel) {
 @Composable
 private fun ScanInitialContent(
     onOpenCamera: () -> Unit,
+    onChooseFromGallery: () -> Unit,
     isCameraGranted: Boolean,
     shouldShowRationale: Boolean,
     onRequestPermission: () -> Unit,
@@ -335,6 +353,63 @@ private fun ScanInitialContent(
                             color = Color.White
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Divider with "or"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(1.dp)
+                                .background(Color(0xFFE0E0E0))
+                        )
+                        Text(
+                            text = "  or  ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(1.dp)
+                                .background(Color(0xFFE0E0E0))
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // "Choose from Gallery" secondary button
+                    OutlinedButton(
+                        onClick = onChooseFromGallery,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFF3F51B5)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF3F51B5)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = null,
+                            tint = Color(0xFF3F51B5),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Choose from Gallery",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF3F51B5)
+                        )
+                    }
                 } else {
                     Text(
                         text = if (shouldShowRationale)
@@ -350,6 +425,63 @@ private fun ScanInitialContent(
                         text = "Grant Camera Permission",
                         onClick = onRequestPermission
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Divider with "or"
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(1.dp)
+                                .background(Color(0xFFE0E0E0))
+                        )
+                        Text(
+                            text = "  or  ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(1.dp)
+                                .background(Color(0xFFE0E0E0))
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Gallery always available — no camera permission needed
+                    OutlinedButton(
+                        onClick = onChooseFromGallery,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.5.dp, Color(0xFF3F51B5)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = Color(0xFF3F51B5)
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = null,
+                            tint = Color(0xFF3F51B5),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Choose from Gallery",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp,
+                            color = Color(0xFF3F51B5)
+                        )
+                    }
                 }
             }
         }

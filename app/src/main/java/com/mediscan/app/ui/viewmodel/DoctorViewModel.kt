@@ -10,10 +10,12 @@ import com.mediscan.app.data.model.Appointment
 import com.mediscan.app.data.model.DoctorOrder
 import com.mediscan.app.data.model.Notification
 import com.mediscan.app.data.model.Prescription
+import com.mediscan.app.data.model.Reminder
 import com.mediscan.app.data.model.User
 import com.mediscan.app.data.repository.AppointmentRepository
 import com.mediscan.app.data.repository.NotificationRepository
 import com.mediscan.app.data.repository.PrescriptionRepository
+import com.mediscan.app.data.repository.ReminderRepository
 import com.mediscan.app.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,6 +34,7 @@ class DoctorViewModel @Inject constructor(
     private val appointmentRepository: AppointmentRepository,
     private val prescriptionRepository: PrescriptionRepository,
     private val notificationRepository: NotificationRepository,
+    private val reminderRepository: ReminderRepository,
     private val auth: FirebaseAuth,
 ) : ViewModel() {
 
@@ -79,6 +82,9 @@ class DoctorViewModel @Inject constructor(
 
     private val _patientPrescriptions = MutableStateFlow<NetworkResult<List<Prescription>>>(NetworkResult.Idle)
     val patientPrescriptions: StateFlow<NetworkResult<List<Prescription>>> = _patientPrescriptions
+
+    private val _patientReminders = MutableStateFlow<NetworkResult<List<Reminder>>>(NetworkResult.Idle)
+    val patientReminders: StateFlow<NetworkResult<List<Reminder>>> = _patientReminders
 
     private val _completeWithOrdersState = MutableStateFlow<NetworkResult<Unit>>(NetworkResult.Idle)
     val completeWithOrdersState: StateFlow<NetworkResult<Unit>> = _completeWithOrdersState
@@ -289,6 +295,14 @@ class DoctorViewModel @Inject constructor(
         }
     }
 
+    /** Load active reminders for a patient (for Patient Current Medicine section) */
+    fun loadPatientReminders(patientId: String) {
+        viewModelScope.launch {
+            _patientReminders.value = NetworkResult.Loading
+            _patientReminders.value = reminderRepository.getActiveReminders(patientId)
+        }
+    }
+
     /** Complete an appointment with doctor orders + save as prescription for patient's Docs */
     fun completeAppointmentWithOrders(
         appointmentId: String,
@@ -356,6 +370,10 @@ class DoctorViewModel @Inject constructor(
 
     fun resetPatientPrescriptions() {
         _patientPrescriptions.value = NetworkResult.Idle
+    }
+
+    fun resetPatientReminders() {
+        _patientReminders.value = NetworkResult.Idle
     }
 
     // ── Analytics computation ──

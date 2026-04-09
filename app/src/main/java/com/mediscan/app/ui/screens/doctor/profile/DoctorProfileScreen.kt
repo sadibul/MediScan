@@ -294,7 +294,6 @@ private fun DoctorProfileContent(
                     icon = Icons.Default.Edit,
                     iconTint = Color(0xFF3F51B5),
                     title = "Edit Profile",
-                    subtitle = "Update your professional information",
                     onClick = onNavigateToEditProfile
                 )
                 MenuDivider()
@@ -302,7 +301,6 @@ private fun DoctorProfileContent(
                     icon = Icons.Default.Lock,
                     iconTint = Color(0xFF9C27B0),
                     title = "Change Password",
-                    subtitle = "Update your password",
                     onClick = onNavigateToChangePassword
                 )
                 MenuDivider()
@@ -310,7 +308,6 @@ private fun DoctorProfileContent(
                     icon = Icons.Default.Notifications,
                     iconTint = Color(0xFFFF9800),
                     title = "Notification Settings",
-                    subtitle = "Manage your notifications",
                     onClick = { /* Future */ }
                 )
             }
@@ -336,7 +333,6 @@ private fun DoctorProfileContent(
                     icon = Icons.AutoMirrored.Filled.Help,
                     iconTint = Color(0xFF607D8B),
                     title = "Help & Support",
-                    subtitle = "Get help and FAQs",
                     onClick = { /* Future */ }
                 )
                 MenuDivider()
@@ -344,7 +340,6 @@ private fun DoctorProfileContent(
                     icon = Icons.Default.Policy,
                     iconTint = Color(0xFF795548),
                     title = "Terms & Privacy Policy",
-                    subtitle = "Read our policies",
                     onClick = { /* Future */ }
                 )
             }
@@ -367,7 +362,6 @@ private fun DoctorProfileContent(
                 icon = Icons.AutoMirrored.Filled.Logout,
                 iconTint = ErrorRed,
                 title = "Logout",
-                subtitle = "Sign out of your account",
                 titleColor = ErrorRed,
                 onClick = onLogout
             )
@@ -434,7 +428,7 @@ private fun DoctorMenuItem(
     icon: ImageVector,
     iconTint: Color,
     title: String,
-    subtitle: String,
+    subtitle: String? = null,
     titleColor: Color = Color(0xFF212121),
     onClick: () -> Unit,
 ) {
@@ -464,7 +458,9 @@ private fun DoctorMenuItem(
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold, color = titleColor)
-                Text(subtitle, fontSize = 12.sp, color = Color(0xFF9E9E9E))
+                if (subtitle != null) {
+                    Text(subtitle, fontSize = 12.sp, color = Color(0xFF9E9E9E))
+                }
             }
 
             Box(

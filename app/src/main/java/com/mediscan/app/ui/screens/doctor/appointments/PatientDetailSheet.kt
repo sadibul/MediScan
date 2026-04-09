@@ -141,7 +141,7 @@ fun PatientDetailSheet(
                 Column(modifier = Modifier.padding(16.dp)) {
                     // Name + avatar row
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Gradient initials avatar
+                        // Profile image or initials fallback
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
@@ -153,14 +153,23 @@ fun PatientDetailSheet(
                                 ),
                             contentAlignment = Alignment.Center,
                         ) {
-                            val initials = appointment.patientName
-                                .split(" ").take(2)
-                                .mapNotNull { it.firstOrNull()?.uppercase() }
-                                .joinToString("").ifEmpty { "P" }
-                            Text(initials, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            if (!appointment.patientProfileImageUrl.isNullOrBlank()) {
+                                coil.compose.AsyncImage(
+                                    model = appointment.patientProfileImageUrl,
+                                    contentDescription = "Patient photo",
+                                    modifier = Modifier.size(52.dp).clip(CircleShape),
+                                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                )
+                            } else {
+                                val initials = appointment.patientName
+                                    .split(" ").take(2)
+                                    .mapNotNull { it.firstOrNull()?.uppercase() }
+                                    .joinToString("").ifEmpty { "P" }
+                                Text(initials, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
                         }
                         Spacer(modifier = Modifier.width(14.dp))
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 appointment.patientName.ifBlank { "Patient" },
                                 fontSize = 17.sp,
@@ -200,16 +209,21 @@ fun PatientDetailSheet(
                             val patient = (patientProfileState as NetworkResult.Success<User>).data
                             val age = patient.dateOfBirth?.let { calculateAge(it) }
 
-                            // 2x2 grid of health stats
+                            // 2x2 grid — simple label + value, no icons
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
                             ) {
                                 if (age != null) {
-                                    InfoChip(Icons.Default.Cake, "Age", "$age yrs", Color(0xFF3F51B5))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Age", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                        Text("$age yrs", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                    }
                                 }
                                 if (!patient.bloodGroup.isNullOrBlank()) {
-                                    InfoChip(Icons.Default.Bloodtype, "Blood", patient.bloodGroup, Color(0xFFE53935))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text("Blood", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                        Text(patient.bloodGroup, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                    }
                                 }
                             }
 
@@ -217,16 +231,19 @@ fun PatientDetailSheet(
                             val hasHeight = !patient.height.isNullOrBlank()
                             val hasWeight = !patient.weight.isNullOrBlank()
                             if (hasHeight || hasWeight) {
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceEvenly,
-                                ) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(modifier = Modifier.fillMaxWidth()) {
                                     if (hasHeight) {
-                                        InfoChip(Icons.Default.Height, "Height", "${patient.height} ft", Color(0xFF43A047))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Height", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                            Text("${patient.height} ft", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                        }
                                     }
                                     if (hasWeight) {
-                                        InfoChip(Icons.Default.FitnessCenter, "Weight", "${patient.weight} kg", Color(0xFFFF9800))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text("Weight", fontSize = 11.sp, color = Color(0xFF9E9E9E))
+                                            Text("${patient.weight} kg", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF424242))
+                                        }
                                     }
                                 }
                             }
@@ -249,7 +266,7 @@ fun PatientDetailSheet(
             // View Records Button
             // ═══════════════════════════════════════
             MediButton(
-                text = "📊  View Records",
+                text = "View Records",
                 onClick = { onViewRecords(appointment.patientId) },
                 modifier = Modifier.fillMaxWidth(),
             )

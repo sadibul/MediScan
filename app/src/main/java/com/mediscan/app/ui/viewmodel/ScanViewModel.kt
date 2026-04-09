@@ -1,6 +1,12 @@
 package com.mediscan.app.ui.viewmodel
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.net.Uri
 import android.util.Log
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -11,9 +17,12 @@ import com.mediscan.app.data.model.Prescription
 import com.mediscan.app.data.model.QualityCheck
 import com.mediscan.app.data.repository.PrescriptionRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 private const val TAG = "ScanViewModel"
@@ -170,6 +179,97 @@ class ScanViewModel @Inject constructor(
     fun retryCapture() {
         _scanState.value = ScanState.Camera
         capturedImageBytes = null
+    }
+
+    /**
+     * Process a gallery image: shows loading state immediately, then decodes,
+     * applies EXIF rotation, re-encodes as JPEG — all on IO thread — then
+     * sends to the AI pipeline. Much faster UX than blocking the main thread.
+     */
+    fun processGalleryImage(uri: Uri, context: Context) {
+        // Show loading UI immediately — no waiting for decode
+        _scanState.value = ScanState.Extracting
+
+        viewModelScope.launch {
+            try {
+                // All heavy work on IO thread
+                val jpegBytes = withContext(Dispatchers.IO) {
+                    // Step 1: Read EXIF rotation
+                    val rotationDegrees = try {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val exif = ExifInterface(stream)
+                            when (exif.getAttributeInt(
+                                ExifInterface.TAG_ORIENTATION,
+                                ExifInterface.ORIENTATION_NORMAL
+                            )) {
+                                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                                else -> 0f
+                            }
+                        } ?: 0f
+                    } catch (_: Exception) { 0f }
+
+                    // Step 2: Decode bitmap at full resolution
+                    val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
+                        BitmapFactory.decodeStream(stream)
+                    }
+
+                    if (bitmap == null) {
+                        Log.e(TAG, "Gallery: failed to decode bitmap")
+                        return@withContext null
+                    }
+
+                    Log.d(TAG, "Gallery: decoded ${bitmap.width}x${bitmap.height}, rotation=$rotationDegrees")
+
+                    // Step 3: Apply EXIF rotation if needed
+                    val finalBitmap = if (rotationDegrees != 0f) {
+                        val matrix = Matrix().apply { postRotate(rotationDegrees) }
+                        val rotated = Bitmap.createBitmap(
+                            bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
+                        )
+                        bitmap.recycle()
+                        rotated
+                    } else {
+                        bitmap
+                    }
+
+                    // Step 4: Compress to JPEG at 95% (matches camera quality)
+                    val out = ByteArrayOutputStream()
+                    finalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    val bytes = out.toByteArray()
+                    out.close()
+                    finalBitmap.recycle()
+
+                    Log.d(TAG, "Gallery: JPEG ${bytes.size} bytes")
+                    bytes
+                }
+
+                if (jpegBytes != null && jpegBytes.isNotEmpty()) {
+                    // Feed into the same pipeline as camera
+                    capturedImageBytes = jpegBytes
+                    when (val extractResult = prescriptionRepository.extractPrescription(jpegBytes)) {
+                        is NetworkResult.Success -> {
+                            val result = extractResult.data
+                            Log.d(TAG, "Gallery extraction: ${result.medications.size} meds found")
+                            _extractionResult.value = result
+                            _scanCounter.value++
+                            _scanState.value = ScanState.ResultReady(result)
+                        }
+                        is NetworkResult.Error -> {
+                            Log.e(TAG, "Gallery extraction error: ${extractResult.message}")
+                            _scanState.value = ScanState.Error(extractResult.message)
+                        }
+                        else -> {}
+                    }
+                } else {
+                    _scanState.value = ScanState.Error("Could not read the selected image")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Gallery processing failed", e)
+                _scanState.value = ScanState.Error("Failed to process gallery image: ${e.message}")
+            }
+        }
     }
 
     /** Switch to camera mode */
