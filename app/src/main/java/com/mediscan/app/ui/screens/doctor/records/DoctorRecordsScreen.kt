@@ -288,6 +288,10 @@ private fun AppointmentsBarChart(monthlyCounts: List<Pair<String, Int>>) {
     val bottomAxisValueFormatter = CartesianValueFormatter { _, value, _ ->
         monthLabels.getOrElse(value.toInt()) { "" }
     }
+    // Format Y-axis labels as whole numbers (appointments are discrete counts)
+    val startAxisValueFormatter = remember {
+        CartesianValueFormatter { _, value, _ -> value.toInt().toString() }
+    }
 
     CartesianChartHost(
         chart = rememberCartesianChart(
@@ -300,7 +304,10 @@ private fun AppointmentsBarChart(monthlyCounts: List<Pair<String, Int>>) {
                     ),
                 ),
             ),
-            startAxis = VerticalAxis.rememberStart(),
+            startAxis = VerticalAxis.rememberStart(
+                valueFormatter = startAxisValueFormatter,
+                itemPlacer = remember { VerticalAxis.ItemPlacer.step({ 1.0 }) },
+            ),
             bottomAxis = HorizontalAxis.rememberBottom(
                 valueFormatter = bottomAxisValueFormatter,
             ),
