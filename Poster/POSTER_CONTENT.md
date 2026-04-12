@@ -65,7 +65,7 @@ The primary objective of this project is to develop a YOLOv8s model capable of d
 ## PROPOSED METHODOLOGY
 ## ═══════════════════════════════════════════════════
 
-The system employs a four-stage AI pipeline for prescription digitization. First, the captured prescription image undergoes quality assessment using Laplacian variance-based blur detection to ensure sufficient clarity for processing. Second, the image is passed through a custom-trained YOLOv8s model (11.1M parameters) that detects and localizes 12 field classes with bounding box predictions. Third, each detected region is processed by PaddleOCR using a 3-attempt extraction strategy — raw crop, preprocessed (grayscale + contrast), and enhanced (adaptive threshold + denoising) — selecting the highest-confidence result. Finally, a spatial grouping algorithm associates related fields by Y-coordinate proximity, linking each medicine name with its corresponding dose strength, dosage schedule, and duration to produce structured medication data. The entire pipeline runs on a FastAPI backend deployed via Docker on Railway Cloud, while the Android app communicates through HTTPS REST API calls. User data, prescriptions, and appointments are stored in Firebase Firestore with real-time synchronization.
+The system employs a four-stage AI pipeline: blur detection filters low-quality images, a custom YOLOv8s model (11.1M parameters) detects and localizes 12 prescription field classes, PaddleOCR extracts text from each detected region using a 3-attempt strategy for maximum accuracy, and a spatial grouping algorithm links each medicine with its dose, schedule, and duration. The pipeline runs on a FastAPI backend deployed via Docker on Railway Cloud, with all user data stored in Firebase Firestore.
 
 ---
 
