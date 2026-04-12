@@ -57,11 +57,7 @@ In Bangladesh, approximately 170 million people rely on a healthcare system that
 ## OBJECTIVES
 ## ═══════════════════════════════════════════════════
 
-- Develop a YOLOv8s model capable of detecting 12 prescription field classes with >95% mAP accuracy.
-- Build a multi-stage AI pipeline integrating object detection, OCR text extraction, and spatial medication grouping.
-- Design a role-based Android application with patient and doctor interfaces using Kotlin and Jetpack Compose.
-- Implement cloud-based features including prescription storage, appointment booking, medicine reminders, and real-time notifications via Firebase.
-- Deploy the AI backend on Railway Cloud for scalable, cost-effective inference.
+The primary objective of this project is to develop a YOLOv8s model capable of detecting 12 prescription field classes with greater than 95% mAP accuracy, combined with a multi-stage AI pipeline integrating object detection, OCR text extraction, and spatial medication grouping. The project further aims to design a role-based Android application with dedicated patient and doctor interfaces using Kotlin and Jetpack Compose, while implementing cloud-based features including prescription storage, appointment booking, medicine reminders, and real-time notifications via Firebase. Finally, the AI backend is deployed on Railway Cloud to ensure scalable, cost-effective inference for real-world usage.
 
 ---
 
@@ -221,7 +217,7 @@ MediScan successfully demonstrates that AI-powered prescription digitization is 
 - [ ] Group members with IDs listed below the banner
 - [ ] Abstract section (~80 words)
 - [ ] Introduction section (~90 words)
-- [ ] Objectives section (5 bullet points)
+- [ ] Objectives section (paragraph, ~75 words)
 - [ ] Proposed Methodology section (~130 words, text-based, no diagram)
 - [ ] System Architecture section with diagram image
 - [ ] Experiments & Results section with metrics table + 7 images
