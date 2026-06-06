@@ -1,0 +1,35 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# ML model files (too large for GitHub, use the zip file to transfer)
+models/
+
+# PaddleOCR model cache (downloaded automatically on first run)
+.paddlex/
+
+# Uploaded images & results (runtime data)
+data/uploads/
+data/results/
+
+# Logs
+*.log
+nohup.out
+/tmp/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Jupyter
+.ipynb_checkpoints/
