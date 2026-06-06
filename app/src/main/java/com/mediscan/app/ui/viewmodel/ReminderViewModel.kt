@@ -137,11 +137,14 @@ class ReminderViewModel @Inject constructor(
             for (dayName in reminder.daysOfWeek) {
                 val calendarDay = dayNameToCalendarDay[dayName] ?: continue
 
+                // Build a precise calendar: start from today, zero out seconds/ms
                 val cal = Calendar.getInstance()
                 cal.set(Calendar.HOUR_OF_DAY, hour)
                 cal.set(Calendar.MINUTE, minute)
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
+                // Force recomputation so timeInMillis is exact
+                cal.timeInMillis = cal.timeInMillis
 
                 // Find nearest occurrence of this day (today or forward)
                 if (cal.get(Calendar.DAY_OF_WEEK) != calendarDay) {
@@ -170,10 +173,13 @@ class ReminderViewModel @Inject constructor(
                             if (canScheduleExact) {
                                 alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
                             } else {
+                                // Permission denied — fall back to inexact alarm (won't crash)
                                 alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
                             }
                             Log.d(TAG, "Scheduled: ${reminder.medicineName} at $timeStr on $dayName, trigger=${cal.timeInMillis}, rc=$requestCode")
                         } catch (e: SecurityException) {
+                            // Exact alarm permission revoked — fall back to inexact alarm
+                            Log.w(TAG, "Exact alarm permission denied, using inexact alarm", e)
                             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
                         }
                     }
@@ -190,14 +196,14 @@ class ReminderViewModel @Inject constructor(
         val baseCode = reminderId.hashCode() and 0x00FFFFFF
         for (i in 0 until 500) {
             val intent = Intent(context, ReminderAlarmReceiver::class.java)
+            // FLAG_UPDATE_CURRENT ensures we always get a valid PendingIntent to cancel,
+            // even after an app restart when the original PendingIntent no longer exists.
             val pendingIntent = PendingIntent.getBroadcast(
                 context, baseCode + i, intent,
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            if (pendingIntent != null) {
-                alarmManager.cancel(pendingIntent)
-                pendingIntent.cancel()
-            }
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
         }
         Log.d(TAG, "Cancelled alarms for reminder: $reminderId")
     }

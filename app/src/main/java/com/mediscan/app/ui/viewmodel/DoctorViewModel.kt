@@ -206,6 +206,8 @@ class DoctorViewModel @Inject constructor(
             _updateProfileState.value = userRepository.updateUserProfile(user)
             if (_updateProfileState.value is NetworkResult.Success) {
                 loadDoctorProfile()
+                // Sync updated name/image/specialization into all appointment documents
+                userRepository.syncAppointmentsWithProfile(user)
             }
         }
     }
@@ -260,6 +262,8 @@ class DoctorViewModel @Inject constructor(
                     val updated = current.copy(profileImageUrl = result.data)
                     userRepository.updateUserProfile(updated)
                     loadDoctorProfile()
+                    // Sync updated image into all appointment documents
+                    userRepository.syncAppointmentsWithProfile(updated)
                 }
             }
         }

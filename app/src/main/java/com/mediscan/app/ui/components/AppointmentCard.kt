@@ -31,7 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -81,7 +83,11 @@ fun AppointmentCard(
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(14.dp)
+                .fillMaxHeight()
+        ) {
             // ── Header: Doctor initials circle + name + status badge ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -126,7 +132,9 @@ fun AppointmentCard(
                             text = appointment.doctorName,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF1A237E)
+                            color = Color(0xFF1A237E),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = appointment.specialization,
@@ -213,12 +221,13 @@ fun AppointmentCard(
                     text = "Concern: ${appointment.complaint}",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
-                    maxLines = 2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     fontSize = 12.sp
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             // ── View Details button ──
             Button(

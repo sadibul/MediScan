@@ -186,13 +186,16 @@ fun PatientHomeScreen(
                     } else {
                         LazyRow(
                             contentPadding = PaddingValues(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.height(200.dp)
                         ) {
                             items(list.take(5)) { appt ->
                                 AppointmentCard(
                                     appointment = appt,
                                     onView = { onNavigateToDoctorDetail(appt.doctorId, appt.dateTime, appt.complaint) },
-                                    modifier = Modifier.width(300.dp)
+                                    modifier = Modifier
+                                        .width(300.dp)
+                                        .fillParentMaxHeight()
                                 )
                             }
                         }

@@ -732,6 +732,7 @@ fun AddReminderDialog(
                                             timeDurationDays = timeDurationDays.toInt(),
                                             medicineTimes = medicineTimes.toList(),
                                             daysOfWeek = selectedDays.toList(),
+                                            startDate = System.currentTimeMillis(),
                                         )
                                     } else {
                                         Reminder(

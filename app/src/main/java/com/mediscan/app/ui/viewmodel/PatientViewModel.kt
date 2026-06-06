@@ -83,9 +83,11 @@ class PatientViewModel @Inject constructor(
         viewModelScope.launch {
             _updateProfileState.value = NetworkResult.Loading
             _updateProfileState.value = userRepository.updateUserProfile(user)
-            // Refresh profile after update
+            // Refresh profile after update and sync denormalized data in appointments
             if (_updateProfileState.value is NetworkResult.Success) {
                 loadUserProfile()
+                // Sync updated name/image into all appointment documents
+                userRepository.syncAppointmentsWithProfile(user)
             }
         }
     }
@@ -195,6 +197,8 @@ class PatientViewModel @Inject constructor(
                     val updatedUser = currentUser.copy(profileImageUrl = result.data)
                     userRepository.updateUserProfile(updatedUser)
                     loadUserProfile() // refresh
+                    // Sync updated image into all appointment documents
+                    userRepository.syncAppointmentsWithProfile(updatedUser)
                 }
             }
         }

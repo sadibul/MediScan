@@ -53,6 +53,8 @@ object ReminderScheduler {
                 cal.set(Calendar.MINUTE, minute)
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
+                // Force recomputation so timeInMillis is exact
+                cal.timeInMillis = cal.timeInMillis
 
                 while (cal.get(Calendar.DAY_OF_WEEK) != calendarDay) {
                     cal.add(Calendar.DAY_OF_MONTH, 1)
@@ -83,10 +85,13 @@ object ReminderScheduler {
                                     pendingIntent
                                 )
                             } else {
-                                alarmManager.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
+                                // Permission denied — fall back to inexact alarm (won't crash)
+                                alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
                             }
                         } catch (e: SecurityException) {
-                            alarmManager.set(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
+                            // Exact alarm permission revoked — fall back to inexact alarm
+                            Log.w(TAG, "Exact alarm permission denied, using inexact alarm", e)
+                            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, cal.timeInMillis, pendingIntent)
                         }
                     }
                     cal.add(Calendar.WEEK_OF_YEAR, 1)
